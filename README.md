@@ -16,7 +16,7 @@
 
 ## 安装（推荐：下载 Release 发布包）
 
-1. 打开本仓库右侧 **Releases**，下载最新发布包 `京工飞鸿-提交版-v0.9.184.zip`；
+1. 打开本仓库右侧 **Releases**（或直接访问 [v0.9.184](https://github.com/bitbravery/jinggong-feihong/releases/tag/v0.9.184)），下载发布包 `jinggong-feihong-v0.9.184.zip`；
 2. 解压到**固定目录**，例如 `D:\京工飞鸿\`（升级要保持同一路径）；
    - 确认解压后该目录里**直接**能看到 `manifest.json`；如果多套了一层文件夹，加载时选到里面那一层；
    - 目录里不能有以 `_` 开头的文件，否则 Edge 会拒绝加载。
