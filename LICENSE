@@ -1,0 +1,31 @@
+京工飞鸿 · 源码许可协议（仅查看与使用，禁止修改）
+Jinggong Feihong Source License (View and Use Only, No Modification)
+版本 1.0 · 2026-10
+
+一、允许（Permitted）
+1. 查看、阅读本仓库的全部源码与文档；
+2. 克隆（clone）、下载（download）本仓库；
+3. 在**不修改**源码的前提下，原样安装、运行、内部使用；
+4. 原样分发本仓库的完整副本，但必须保留本许可文件与版权声明。
+
+二、禁止（Prohibited）
+1. 修改、改写、二次开发本源码，或基于本源码创建衍生作品；
+2. 分发任何修改过的版本；
+3. 将本源码或其衍生作品用于商业销售、付费服务；
+4. 移除或篡改版权声明与本许可文本。
+
+三、说明（Notes）
+1. "不修改"指不改变源码内容；调整浏览器设置、扩展的本地配置数据（如楼宇映射）不属于修改。
+2. 如需定制功能，请先联系版权持有人取得书面授权。
+3. 本软件按"现状"提供，不附带任何明示或默示担保；使用风险由使用者自行承担。
+
+四、版权（Copyright）
+Copyright (c) 2026 京工飞鸿项目组。保留所有权利。
+
+---
+
+Summary in English: viewing, cloning, downloading and running this repository
+unmodified are permitted, including verbatim redistribution with this notice.
+Modifying the source, creating derivative works, or selling it is not permitted
+without written permission from the copyright holder. The software is provided
+"as is", without warranty of any kind.

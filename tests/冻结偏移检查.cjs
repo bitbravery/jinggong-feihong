@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const source=fs.readFileSync(__dirname+'/../table-layout.js','utf8');const fn=source.slice(source.indexOf(' function updateFreeze(){'),source.indexOf(' freezeInputs.forEach'));
+const rows={statusRow:{style:{},classList:{toggle(){}},getBoundingClientRect:()=>({height:80})},queryRow:{style:{},classList:{toggle(){}},getBoundingClientRect:()=>({height:54})},freezeHeader:{checked:true}};
+const freezeInputs=[{dataset:{freeze:'statusRow'},checked:true},{dataset:{freeze:'queryRow'},checked:false}];const vars={};
+const context={document:{getElementById:id=>rows[id]},freezeInputs,table:{classList:{toggle(){}},style:{setProperty:(k,v)=>vars[k]=v}}};
+vm.runInNewContext(fn+'updateFreeze();',context);assert.equal(rows.queryRow.style.top,'auto');assert.equal(vars['--header-offset'],'80px');
+freezeInputs[1].checked=true;vm.runInNewContext('updateFreeze();',context);assert.equal(rows.queryRow.style.top,'80px');assert.equal(vars['--header-offset'],'134px');
+freezeInputs[0].checked=false;vm.runInNewContext('updateFreeze();',context);assert.equal(rows.statusRow.style.top,'auto');assert.equal(rows.queryRow.style.top,'0px');
+freezeInputs[1].checked=false;vm.runInNewContext('updateFreeze();',context);assert.equal(rows.queryRow.style.top,'auto');assert.equal(vars['--header-offset'],'0px');
+console.log('通过：所有冻结组合，未冻结行不添加顶部偏移，不留下空白或覆盖数据。');

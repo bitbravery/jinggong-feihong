@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');const {queryRows,orderTime}=require('../logic.js');
+const rows=[{time:'2026-10-19 09:12:34',sender:'张三',receiver:'王五'},{time:'2026-10-18',sender:'李四',receiver:'赵六'},{time:'2026-10-19 08:20',sender:'李四',receiver:'王五'}];
+assert.equal(queryRows(rows,{sort:'time'})[0].time,'2026-10-18');assert.equal(queryRows(rows,{sort:'time',descending:true})[0].sender,'张三');
+assert.equal(queryRows(rows,{day:'2026-10-19',sender:'李四',receiver:'王五'}).length,1);
+assert.equal(queryRows(rows,{sort:'sender'})[0].sender,'李四');assert.equal(rows[0].sender,'张三');
+assert.equal(orderTime(rows[0].time),'2026-10-19 09:12');assert.equal(orderTime('2026-10-18'),'2026-10-18');
+const liveSrc=require('node:fs').readFileSync(__dirname+'/../live.js','utf8');
+const clearHandler=liveSrc.split("$('clearFilters').onclick=")[1].split('};')[0];
+assert(!clearHandler.includes('activeColumn'),'清除筛选不能重置状态栏目');
+assert(clearHandler.includes("$('search').value=''")&&clearHandler.includes("$(id).value='all'"),'仍要清空搜索与下拉筛选');
+console.log('通过：日期/姓名精确筛选、时间升降序、中文拼音排序、源记录不变及不补造分钟。');

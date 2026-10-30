@@ -1,0 +1,36 @@
+// 导出版面：发车清单必须 16 列、A4 横向、fitToPage 生效、宽度预设、每页重复表头；完整数据表保留 19 列。
+const assert=require('node:assert/strict');
+const {workbook}=require('../export.js');
+const header=['序号','单号','下单时间','物流信息','寄件人工号','寄件人姓名','寄件人电话','寄件校区地址','寄件宇楼地址','寄件房间号地址','寄件物品信息','收件人姓名','收件人电话','收件校区地址','收件地址宇楼','收件地址房间号','处理时间','处理人','读取范围内单号出现次数','原站序号'];
+const rows=[header,...Array.from({length:5},(_,i)=>header.map((_,j)=>j===1?'JGKD202600000000'+i:j===10?'很长的物品描述文字用于测试换行'.repeat(2):'样例'+(i+1)))];
+const bytes=Buffer.from(workbook(rows));
+const text=bytes.toString('utf8');
+
+assert(text.includes('sheet2.xml'),'必须包含第二个工作表');
+assert(text.includes('发车清单'),'打印表名应为“发车清单”');
+assert(text.includes('<pageSetUpPr fitToPage="1"/>'),'必须开启 fitToPage，否则 fitToWidth 不生效');
+assert(text.includes('orientation="landscape"'),'必须横向');
+assert(text.includes('paperSize="9"'),'必须 A4');
+assert(text.includes('fitToWidth="1"')&&text.includes('fitToHeight="0"'),'按宽度缩放、按需分页');
+assert(text.includes('left="0.25"'),'页边距要收窄');
+assert(!text.includes('verticalCentered'),'整表不垂直居中，按用户要求只居中单元格内容');
+assert(text.includes('horizontal="center" vertical="center" wrapText="1"'),'单元格内容要水平+垂直居中');
+assert(text.includes('ht="24" customHeight="1"'),'数据行必须固定行高');
+assert(text.includes('ht="30" customHeight="1"'),'表头行固定行高');
+assert(text.includes('Print_Titles'),'每页要重复表头');
+assert(text.includes('dimension ref="A1:P6"'),'打印表应为 16 列（A..P）');
+assert(text.includes('dimension ref="A1:T6"'),'完整数据表应为 20 列（A..T）');
+assert(text.includes('序号'),'打印表首列表头应为“序号”');
+const cols=(text.match(/<col min=/g)||[]).length;
+assert.equal(cols,16,'打印表必须预设 16 列宽度');
+assert(text.includes('width="18"')&&text.includes('width="24"'),'单号/物品等列宽要按内容预设');
+assert(text.includes('宋体')&&text.includes('<sz val="9"/>'),'默认字号 9，便于一页放下');
+assert(text.includes('<styleSheet')&&text.includes('wrapText="1"'),'长文本要自动换行（在样式里设置）');
+assert(text.includes('s="2"'),'数据单元格要套用带边框与换行的样式');
+assert(text.includes('s="1"'),'表头要用加粗样式');
+const simple=Buffer.from(require('../export.js').simpleWorkbook([['修改时间','单号'],['2026-10-22 10:00','JGKD1']]));const st=simple.toString('utf8');
+assert(st.includes('状态修改历史'),'历史导出必须是 xlsx 单表');
+assert(!st.includes('sheet2.xml'),'历史导出只含一个工作表');
+const nl=Buffer.from(workbook([['寄件地址\n房间号','收件地址\n房间号'],['1','2']])).toString('utf8');
+assert(nl.includes('寄件地址\n房间号'),'表头两行显示必须原样保留换行');
+console.log('通过：发车清单 16 列、A4 横向、fitToPage 与页边距生效、宽度预设、表头重复；完整数据表保留 19 列。');

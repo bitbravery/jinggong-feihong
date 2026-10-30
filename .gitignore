@@ -1,0 +1,21 @@
+# 打包产物与本地资料，不入库
+*.zip
+*.mp4
+*.xlsx
+*.pdf
+!docs/*.pdf
+*.pptx
+!docs/*.pptx
+
+# 本地核对、分析依赖、日志
+接入核对/
+.analysis-deps/
+*.log
+
+# 系统与编辑器
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+node_modules/

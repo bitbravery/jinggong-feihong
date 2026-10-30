@@ -1,0 +1,2 @@
+(function(root){function needsBatchConfirm(count){return Number(count)>5;}
+ function allowed(orders){return Array.isArray(orders)&&orders.length>0&&new Set(orders.map(o=>o?.id)).size===orders.length&&orders.every(o=>o&&/^JGKD\d+$/.test(o.id)&&!o.duplicateOrder);}const api={allowed,needsBatchConfirm};if(typeof module!=='undefined')module.exports=api;else root.FeiHongWritePolicy=api;})(typeof self!=='undefined'?self:globalThis);

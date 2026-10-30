@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');const {identity,senderInfo,matches}=require('../logic.js');
+const student={personId:'312000',building:'文萃楼A',fromCampus:'良乡'};
+assert.equal(identity(student.personId),'学生');assert(senderInfo(student).proxy);
+assert(!senderInfo({...student,building:'学生服务中心'}).proxy);
+assert(!senderInfo({...student,personId:'612000'}).proxy);
+assert.equal(senderInfo({...student,personId:'jgkja'}).kind,'unknown');
+assert(!senderInfo(student,[]).proxy);assert(senderInfo({...student,building:'测试办公室'},['测试']).proxy);
+assert(matches(student,{status:'all',direction:'all',identity:'疑似代老师下单',region:'all',search:''},{}));
+console.log('通过：学生身份保留、办公楼疑似代办、服务中心排除、未知身份及自定义规则。');
+const service={personId:'jgkja',sender:'京工一号',building:'学生服务中心'};
+assert.equal(senderInfo(service).label,'京工飞鸿');assert.equal(senderInfo(service).kind,'service');assert(!senderInfo(service).proxy);
+for(const sender of ['京工二号','京工十号','京工12号'])assert.equal(senderInfo({...service,sender}).kind,'service');
+assert.equal(senderInfo({...service,sender:'其他寄件人'}).kind,'unknown');
+assert(matches(service,{status:'all',direction:'all',identity:'京工飞鸿',region:'all',search:''},{}));
+console.log('通过：京工几号显示京工飞鸿，其他未知账号不误判，可按京工飞鸿筛选。');

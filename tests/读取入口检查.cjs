@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs');
+const html=fs.readFileSync(require('node:path').join(__dirname,'..','index.html'),'utf8');
+for(const text of ['读取当前页','近一个月','自定义时段'])assert(html.includes('>'+text+'</button>'));
+assert(/read-actions[^>]*>[\s\S]*readSource[\s\S]*readRecent[\s\S]*readAll[\s\S]*readFrom[\s\S]*readTo[\s\S]*<\/div><div class="header-layout-controls">/.test(html));
+assert(!html.includes('原站提交 · 逐单核验'));
+assert(html.indexOf('date-range.js')>0&&html.indexOf('date-range.js')<html.indexOf('live.js'));
+const live=fs.readFileSync(require('node:path').join(__dirname,'..','live.js'),'utf8');
+assert(!live.includes("request({type:'readAllFlows'})"));
+assert(!live.includes('正在读取待办、已办、抄送给我'));
+assert(live.includes("$('readSource').textContent='读取当前页';"),'两个页面都用“读取当前页”');
+assert(live.includes("$('flowPagesWrap').hidden=v!=='flow'"),'流程页显示“前 N 页”控件');
+assert(live.includes('readFlows(n)'),'流程页按页数读取');
+assert(live.includes('o.flow!==s.flowTab'),'流程读取必须按分类合并，不能整块替换（否则读已办会冲掉待办）');
+console.log('通过：快件页与流程页使用同一组三个读取入口，各自按自己的数据源读取。');

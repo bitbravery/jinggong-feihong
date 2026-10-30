@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const order={id:'JGKD2026092036825'};let tabClicks=0,entryClicks=0,submitClicks=0;const keys=[];
+const serviceTab={innerText:'京工飞鸿两校快件系统',classList:{contains:()=>false},click(){tabClicks++;}};
+const entry={innerText:'物流状态调整单',closest:()=>null,getBoundingClientRect:()=>({height:20}),contains:()=>false,click(){entryClicks++;}};
+const oldTab={innerText:'物流状态调整单',closest:()=>({}),getBoundingClientRect:()=>({height:20}),click(){throw Error('不能复用旧表单标签');}};
+const box={value:'',focus(){},closest:()=>null,getBoundingClientRect:()=>({left:20,top:40,width:160,height:22}),dispatchEvent:e=>keys.push(e)};
+const radios=Array.from({length:2},(_,g)=>['订单申请','已揽件','发出/派送中','已送达','已签收'].map((value,i)=>({value,id:'mini-'+g+'$ck$'+i}))).flat();
+const document={getElementById:id=>id==='DH$text'?box:null,body:{dispatchEvent:e=>keys.push(e.type||e),getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})},querySelectorAll:s=>s==='.mini-tab'?[serviceTab]:s.startsWith('li.bl-item[data-flowid=')?[entry]:s==='input[type="radio"]'?radios:[]};
+const window={mini:{get:()=>({setValue:v=>box.value=v,fire:()=>{throw Error('不再用valuechanged代替回车');}})}};
+const ctx={Map:function LegacyMap(){},module:{exports:{}},document,window,top:window,location:{origin:'https://ehall.bit.edu.cn',pathname:'/EIP/nonlogin/mixportal/framework.htm'},getComputedStyle:()=>({visibility:'visible'}),Event:class{constructor(t,o){this.type=t;Object.assign(this,o||{});}},KeyboardEvent:class{constructor(type,options){this.type=type;Object.assign(this,options);}},MouseEvent:class{constructor(type,options){this.type=type;Object.assign(this,options);}}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../source.js','utf8'),ctx);const act=ctx.module.exports.sourceAction;
+assert(act({type:'navigate',kind:'service'}).navigated);assert.equal(tabClicks,1);ctx.location.pathname='/EIP/nonlogin/elobby/service/introduction/h8jpsdrafk3yxn3mdxt3dbgkekzxxiwt.htm';assert(act({type:'openForm'}).openRequested);assert.equal(entryClicks,1);
+ctx.location.pathname='/EIP/flow/flowForm/3c9e2b168f194a628014fa4dd672971e.htm';assert(act({type:'prepare',order}).prepared);assert.equal(box.value,order.id);assert.deepEqual(keys.map(e=>e.type||e),['change','blur','mousedown','mouseup','click'],'填完单号要先失焦再点空白触发联动');assert.equal(submitClicks,0);
+console.log('通过：进入业务系统、排除旧表单标签、点击实际办理入口、填完整单号、点空白触发联动，准备阶段不提交；原站覆盖全局Map时仍能准备表单。');

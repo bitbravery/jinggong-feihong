@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">京工飞鸿标志（根据截图重绘）</title>
+  <circle cx="64" cy="64" r="61" fill="#e60020"/>
+  <path fill="#fff" d="M15 66c8-13 20-8 35 6L77 37h34L98 54H76L49 96C37 85 33 72 15 66Z"/>
+  <path fill="#fff" d="M74 58h28c-6 15-19 23-40 21Z"/>
+  <circle cx="25" cy="63" r="1.7" fill="#e60020"/>
+  <path fill="#fff" d="m54 81-9 15h7l9-15Zm10 0-9 15h13l5-8h-6l-2 3h-4l4-6h8l3-4Z"/>
+</svg>

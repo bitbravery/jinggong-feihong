@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');let css,stored;
+const handle={setAttribute(){},setPointerCapture(){}},classes=new Set();
+const classList={add:x=>classes.add(x),remove:x=>classes.delete(x),toggle:(x,on)=>on?classes.add(x):classes.delete(x)};
+const window={innerWidth:1600,addEventListener(){}};
+const document={getElementById:id=>id==='sidebarResizer'?handle:{getBoundingClientRect:()=>({width:232})},documentElement:{style:{setProperty:(k,v)=>css=v}},body:{classList}};
+vm.runInNewContext(fs.readFileSync(__dirname+'/../sidebar-layout.js','utf8'),{document,window,localStorage:{getItem:()=>null,setItem:(k,v)=>stored=v}});
+handle.onpointerdown({button:0,clientX:232,pointerId:1,preventDefault(){}});handle.onpointermove({clientX:332});assert.equal(css,'332px');handle.onpointerup();assert.equal(stored,'332');assert.equal(classes.size,0);
+handle.onkeydown({key:'ArrowRight',preventDefault(){}});assert.equal(css,'342px');handle.ondblclick();assert.equal(css,'232px');
+handle.onpointerdown({button:0,clientX:232,pointerId:2,preventDefault(){}});handle.onpointermove({clientX:2000});assert.equal(css,'420px');handle.onpointercancel();assert.equal(classes.size,0);console.log('通过：拖动、宽度上限、保存、键盘微调、双击复位、取消拖动。');
+window.FeihongSidebar.compact();assert.equal(css,'72px');assert(classes.has('sidebar-icon-only'));window.FeihongSidebar.expand();assert.equal(css,'232px');assert(!classes.has('sidebar-icon-only'));
