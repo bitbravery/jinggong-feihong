@@ -1,5 +1,15 @@
 # 京工飞鸿 · 两校区快件工作台（Edge 扩展）
 
+## ⬇ Download / 下载
+
+**最新版本：[v0.9.184](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
+
+直接下载安装包 → [`jinggong-feihong-v0.9.184.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v0.9.184/jinggong-feihong-v0.9.184.zip)
+SHA256：`6942B797AF24245A7A9B97FB0FEECBFF8187A018564163ABBF87B9A8F2F0125B`
+
+> 下载后在 Edge 里「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
+> 只想要源码：`Code → Download ZIP`（不含打包好的发布包，版本需自行确认）。
+
 面向北京理工大学良乡 / 中关村两校区快递收发场景的浏览器扩展：在门户（ehall）之上做**查询、分类、批量读取、状态调整、打印申请单**，把原本要在门户里反复点击的操作收敛到一个工作台里。
 
 > 当前版本 **0.9.184**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
@@ -81,7 +91,23 @@ Get-ChildItem tests -Filter *.cjs | ForEach-Object { & node $_.FullName; if ($LA
 3. 批量通过/退回属写操作，首次使用请先用 1 单验证；
 4. 提交结果以“看到提交成功”或“调整单标签自动关闭”为准，不做二次回读。
 
+兼容性：Edge 120+（Chromium 内核 MV3）；未在 Chrome / Firefox 上测试。
+
+## 版本与发布
+
+- 版本号语义：`0.9.x`，每次改动 +1；四个文件必须一致（`tests/版本一致性检查.cjs` 校验）；
+- 每个版本都发一个 **Release**，说明固定包含三段：**本次修复 / 已知问题 / 兼容性**；
+- 版本记录见 [`CHANGELOG.md`](CHANGELOG.md)，发布流程见 [`docs/发布规范.md`](docs/发布规范.md)。
+
+## 授权与适用范围
+
+- 本项目是**校内收发场景的内部工具**，公开代码只为便于同行参考与审计；
+- 涉及学校门户与业务流程，**使用前请确认本单位（信息化 / 保密）授权**，不要用于未授权的场景；
+- 仓库中的示例数据均为虚构占位（如 `13800000000`），不含真实姓名、电话与单号；
+- 源码可见、可下载、可原样使用；**禁止修改与衍生分发**，详见 [`LICENSE`](LICENSE)。
+
 ## 许可
 
 **源码可见、可下载、可原样使用；禁止修改与衍生分发。** 详见 [`LICENSE`](LICENSE)。
 如需定制功能，请先联系版权持有人取得书面授权。
+
