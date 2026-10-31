@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.193';
+const COMPONENT_VERSION = '0.9.194';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -577,14 +577,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       let rb=null,now='';
       try{rb=await queryOne(msg.order.id,{allowEmpty:true});}catch{}
       if(rb&&rb.total===1){try{now=SourceMapping.normalize(rb)[0].status||'';}catch{}}
-      if(now&&now===msg.target){mark('settled');stage('回读确认：原站已是「'+now+'」');return {submitted:true,confirmed:true,completion:'readback',verified:true,status:now,timing,basis:'按单号回查原站已是「'+now+'」',staleToast,presses:await pressNote(confirmToken)};}
+      if(now&&now===msg.target){mark('settled');stage('回读确认：原站已是「'+now+'」');return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'readback',verified:true,status:now,timing,basis:'按单号回查原站已是「'+now+'」',staleToast,presses:await pressNote(confirmToken)};}
       let extra='';try{const d=await run({type:'confirmDump'});extra=d.filter(r=>r&&r.confirmDump&&(r.has||r.boxes)).map(r=>r.path+':文本'+(r.has?'有':'无')+' 弹窗'+r.boxes+' 按钮['+r.btns.join('/')+']'+(r.diag?'｜'+r.diag:'')+(r.masks&&r.masks.length?'｜遮罩['+r.masks.join('/')+']':'')+(r.handler?'｜处理函数 '+r.handler:'')+(r.miniType?'｜组件 '+r.miniType:'')+(r.btnHtml?'｜'+r.btnHtml:'')).join('；');}catch{}
       let open='';try{const g=await run({type:'confirmGone'});const o=g.find(r=>r&&r.html);if(o&&o.html)open='（弹窗仍在 '+o.html+'）';}catch{}
       throw Error(e.message+(now?'；已回读原站，当前状态是「'+now+'」，未到「'+msg.target+'」':'；回读未取到该单状态')+(cleaned?'；已尝试关闭残留确认框 '+cleaned+' 次':'')+(extra?'（'+extra+'）':'')+open+staleNote+'；'+(await pressNote(confirmToken)));
     }
     mark('confirmed');
     stage('确认已返回，等待原站关闭调整单标签…');
-    if(confirmHit&&confirmHit.submissionComplete){mark('settled');stage('调整单标签已关闭，按已提交处理');return {submitted:true,confirmed:true,completion:'tabclosed',verified:false,timing,basis:'调整单标签已自动关闭',staleToast,presses:await pressNote(confirmToken)};}
+    if(confirmHit&&confirmHit.submissionComplete){mark('settled');stage('调整单标签已关闭，按已提交处理');return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'tabclosed',verified:false,timing,basis:'调整单标签已自动关闭',staleToast,presses:await pressNote(confirmToken)};}
     // 确认成功后，门户会在稍后自动关掉调整单标签；等它关掉再进入下一单，
     // 否则下一单的准备阶段会看到“残留 1 张”，去点它反而把标签卡住。
     try{
@@ -596,7 +596,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       }
     }catch{}
     mark('settled');stage('已提交');
-    return {submitted:true,confirmed:true,completion:'confirmed',timing,basis:'看到“提交成功”',staleToast,presses:await pressNote(confirmToken)};
+    return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'confirmed',timing,basis:'看到“提交成功”',staleToast,presses:await pressNote(confirmToken)};
    }
    if(msg.type==='verify'){
     if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效回查单号');

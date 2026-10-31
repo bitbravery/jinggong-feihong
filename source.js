@@ -469,12 +469,21 @@ function sourceAction(command){
   if(command.type==='confirmSubmit'){
    const dirtyAlert=fhDirtyAlert();
    if(dirtyAlert){
+     let retry=window.__fhDirtyRetry;
+     if(!retry||retry.token!==command.token)retry=window.__fhDirtyRetry={token:command.token,count:0};
+     const text=dirtyAlert.text.replace(/^提示/,'').replace(/确定$/,'').trim().slice(0,90);
      fhDismiss(dirtyAlert.box);
-     return {error:'原站拒绝提交：'+dirtyAlert.text.replace(/^提示/,'').replace(/确定$/,'').trim().slice(0,120)+'；已点确定关闭提示，本单未提交，继续下一单。'};
+     if(retry.count>=1)return {error:'原站提示「'+text+'」；已重新提交一次仍被拦截，本单未提交，继续下一单。'};
+     retry.count++;
+     let send=null;
+     try{send=document.getElementById('sendBtn')||(window.parent&&window.parent.document&&window.parent.document.getElementById('sendBtn'));}catch{}
+     if(!send)return {error:'原站提示「'+text+'」；已关闭提示，但没找到右上角“提交”，无法重新提交，本单未提交。'};
+     try{send.click();}catch{}
+     return {waiting:true,seen:true,dirtyRetry:retry.count,diag:'原站提示数据不完整 → 已点确定并重新提交（第 '+retry.count+' 次）'};
    }
    // 成功只认：本单点过「确定」之后新出现的“提交成功”（现场 0.9.176：页面上残留/别处的“提交成功”曾让没点确定的单被记成已改好）
    const okText=fhPressed(command.token)&&fhToast(/^提交成功$/,true);
-   if(okText){delete window.__fhConfirmSeen;window.__fhPressState=null;try{delete fhTop.__fhPressed;}catch{}return {confirmed:true,via:'toast'};}
+   if(okText){delete window.__fhConfirmSeen;window.__fhPressState=null;try{delete fhTop.__fhPressed;}catch{}return {confirmed:true,via:'toast',resubmitted:!!(window.__fhDirtyRetry&&window.__fhDirtyRetry.count>0)};}
    const badText=fhToast(/提交失败|保存失败|操作失败/,true);
    if(badText)return {error:'原站提示「'+badText+'」，本次未改成功。'};
    const hit=fhDialogs();
@@ -521,7 +530,7 @@ function sourceAction(command){
      }
     }catch{}
    }
-   if(fhPressed(command.token)&&fhToast(/^提交成功$/,true)){delete window.__fhConfirmSeen;window.__fhPressState=null;try{delete fhTop.__fhPressed;}catch{}return {confirmed:true,via:'toast'};}
+   if(fhPressed(command.token)&&fhToast(/^提交成功$/,true)){delete window.__fhConfirmSeen;window.__fhPressState=null;try{delete fhTop.__fhPressed;}catch{}return {confirmed:true,via:'toast',resubmitted:!!(window.__fhDirtyRetry&&window.__fhDirtyRetry.count>0)};}
    if(!fhDialogs().length)return {waiting:true,seen:true,closedNoToast:true,pressed:fhPressed(command.token),tries:ps.tries};
    return {waiting:true,seen:true,buttons:hit.length,clickedButOpen:true,diag:fhDiag(btn,ps.tries>0)+'｜已按 '+ps.tries+' 次'+(ps.miniFired?'｜已调用 MiniUI 按钮事件':'')};
   }

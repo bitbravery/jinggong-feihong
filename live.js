@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.193')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.194')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -177,7 +177,7 @@ async function submit(e){
     }
    }
    // 结果里写明判定依据：看到“提交成功” / 调整单标签已自动关闭 / 按单号回查
-   doneCount++;row.result=submitted&&submitted.verified?('已回读确认：'+target):'已确认提交（'+(submitted&&submitted.basis||'未回读')+'）';row.basis=submitted&&submitted.basis||'';if(submitted&&submitted.presses)row.presses=submitted.presses;if(submitted&&submitted.staleToast)row.staleToast='提交前页面上已有 '+submitted.staleToast+' 处“提交成功”字样（已忽略）';row.confirmedAt=formatTime(new Date());row.timing={prepare:prep&&prep.timing||null,submit:submitted&&submitted.timing||null};if(!save())throw Error('已确认提交，但历史保存失败；批量已停止。');
+   doneCount++;row.result=submitted&&submitted.verified?('已回读确认：'+target):'已确认提交（'+(submitted&&submitted.basis||'未回读')+'）';row.basis=submitted&&submitted.basis||'';if(submitted&&submitted.presses)row.presses=submitted.presses;if(submitted&&submitted.staleToast)row.staleToast='提交前页面上已有 '+submitted.staleToast+' 处“提交成功”字样（已忽略）';if(submitted&&submitted.resubmitted)row.reason=(row.reason?row.reason+' · ':'')+'原站提示数据不完整，已点确定并重新提交一次';row.confirmedAt=formatTime(new Date());row.timing={prepare:prep&&prep.timing||null,submit:submitted&&submitted.timing||null};if(!save())throw Error('已确认提交，但历史保存失败；批量已停止。');
    consecutiveFails=0;
    setStage(tagText()+'状态修改成功，请等待全部改完后刷新原网站查看');toast('已提交 '+order.id,1500);setOrderState(order.id,'已改好','ok');
     }catch(err){
