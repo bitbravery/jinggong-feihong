@@ -120,14 +120,14 @@ body.has-selection-bar #work{padding-bottom:96px}
 .read-pages #flowFrom,.read-pages #flowTo{width:112px;min-width:112px;padding:4px 4px;font-size:12px}
 
 /* v0.9.75：扩展内打印申请单 */
-.print-dialog{width:760px;max-width:96vw;padding:0;border:0;border-radius:12px}
+.print-dialog{width:880px;max-width:96vw;padding:0;border:0;border-radius:12px}
 .print-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
-.print-form{padding:26px 34px;background:#fff;color:#111;font-size:13px}
-.pf-title{text-align:center;font-size:22px;margin:6px 0 4px}
+.print-form{padding:28px 36px;background:#fff;color:#111;font-size:15.6px}
+.pf-title{text-align:center;font-size:27px;margin:6px 0 4px}
 .pf-no{text-align:center;color:#333;margin:0 0 14px;letter-spacing:.5px}
 .pf-sec{background:#e9edf2;border-left:4px solid #2f6fb3;padding:6px 10px;margin:14px 0 8px;font-weight:600}
 .pf-table{width:100%;border-collapse:collapse;margin-bottom:6px}
-.pf-table th,.pf-table td{border:1px solid #333;padding:6px 8px;font-weight:400;text-align:left}
+.pf-table th,.pf-table td{border:1px solid #333;padding:7px 10px;font-weight:400;text-align:left}
 .pf-table th{width:14%;white-space:nowrap;background:#fafafa}
 .pf-status{margin:4px 0 10px}
 .pf-tip-title{margin:10px 0 4px;font-weight:600}
@@ -137,11 +137,11 @@ body.has-selection-bar #work{padding-bottom:96px}
  #printForm,#printForm *{visibility:visible}
  #printForm{position:absolute;left:0;top:0;width:100%;padding:0}
  .print-actions{display:none}
- @page{size:A4;margin:16mm}
+ @page{size:A4 landscape;margin:10mm}
 }
 
 /* v0.9.82：预览与打印同列宽 */
-.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:16%}.print-form .pf-table col.c2{width:34%}.print-form .pf-table col.c3{width:16%}.print-form .pf-table col.c4{width:34%}
+.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:20%}.print-form .pf-table col.c2{width:30%}.print-form .pf-table col.c3{width:20%}.print-form .pf-table col.c4{width:30%}
 
 /* v0.9.83：读取区不裁切、日期列收窄；预览表格字号 */
 .header-actions{max-width:none}
@@ -212,3 +212,30 @@ body.has-selection-bar #toast{bottom:104px}
 .history-batch td{background:#fafcfb;color:var(--muted);font-size:12px;padding:4px 12px;border-top:1px dashed #d6e3dc}
 .history-live.unknown{background:#eeeeee;color:#666}
 .history-picked{font-size:12px;color:var(--muted);white-space:nowrap}
+/* v0.9.185：目标状态改为五个点选（与门户一致） */
+.status-picker-field{border:0;padding:0;margin:0 0 6px}
+.status-picker-field legend{font-size:12px;color:var(--muted);padding:0 0 6px}
+.status-picker{display:flex;flex-wrap:wrap;gap:18px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.status-option{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:14px;color:var(--ink);user-select:none}
+.status-option input{width:18px;height:18px;accent-color:var(--green);margin:0;cursor:pointer}
+.status-option:has(input:checked){color:var(--green);font-weight:600}
+
+/* v0.9.185：表格字号（可调，作用于快件表与历史表） */
+#parcelTable{font-size:var(--table-fs,14px)}
+.history-table{font-size:var(--table-fs,14px)}
+
+/* v0.9.185：状态修改历史 · 重要提示 */
+.history-notice{margin:14px 0 16px;border:1px solid #e6d9b8;background:#fdf8ec;border-radius:10px;padding:0 14px}
+.history-notice summary{cursor:pointer;padding:12px 2px;font-size:14px;color:#8a6413;list-style:none}
+.history-notice summary::-webkit-details-marker{display:none}
+.history-notice summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+.history-notice[open] summary::before{content:"▾ "}
+.history-notice-body{padding:0 2px 14px;font-size:13px;line-height:1.85;color:var(--ink)}
+.history-notice-body h3{margin:14px 0 6px;font-size:13px;color:#8a6413}
+.history-notice-body ol{padding-left:22px;margin:6px 0}
+.history-notice-body li{margin:4px 0}
+.history-notice-body dl{margin:6px 0}
+.history-notice-body dt{font-weight:600;margin-top:8px}
+.history-notice-body dd{margin:2px 0 0;color:#4a5a54}
+.history-notice-body code{background:#f2ece0;padding:1px 5px;border-radius:4px;font-size:12px}
+.history-notice-body a{color:var(--green)}

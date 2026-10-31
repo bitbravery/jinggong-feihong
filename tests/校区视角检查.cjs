@@ -8,12 +8,13 @@ assert(match(incoming,'良乡','in-arrived'));assert(!match(incoming,'中关村'
 assert(match({...incoming,status:'已签收'},'良乡','in-signed'));
 assert(match(out,'良乡','all'));assert(!match(incoming,'良乡','all'));
 for(const campus of ['良乡','中关村']){
- assert.deepEqual(columns(campus).filter(c=>c.key!=='both').slice(0,6).map(c=>c.label),[campus+'所有寄件',campus+'订单申请',campus+'已揽件',campus+'发出/派送中','已送达'+campus,campus+'已签收']);
+ assert.deepEqual(columns(campus).filter(c=>c.key!=='both').slice(0,6).map(c=>c.label),[campus+'所有寄件',campus+'订单申请',campus+'已揽件',campus+'发出/派送中',(campus==='良乡'?'中关村':'良乡')+'发出/派送中','已送达'+campus]);
+ const tr=columns(campus).findIndex(c=>c.key==='out-transit');assert.equal(columns(campus)[tr+1].key,'in-transit','对方“发出/派送中”必须紧挨本校');
  assert.equal(new Set(columns(campus).map(c=>c.key)).size,columns(campus).length);
 }
 console.log('通过：两校区六个栏目名称、所有寄件仅含本校寄出、送达/签收按收件校区。');
 
-const all=columns('良乡');for(const label of ['中关村已揽件','中关村已发出','中关村已签收','东区已揽件','东区订单申请','已送达东区件'])assert(all.some(c=>c.label===label));
+const all=columns('良乡');for(const label of ['中关村已揽件','中关村发出/派送中','中关村已签收','东区已揽件','东区订单申请','已送达东区件'])assert(all.some(c=>c.label===label));
 const {matchesColumn}=require('../perspective.js');const east=all.find(c=>c.key==='east-collected');assert(matchesColumn({fromCampus:'良乡',toCampus:'中关村',status:'已揽件',building:'文萃楼A'},'良乡',east));assert(!matchesColumn({fromCampus:'良乡',toCampus:'中关村',status:'已揽件',building:'学生服务中心'},'良乡',east));
 console.log('通过：原站对方校区及东区快捷标签、地址字段及物流状态组合。');
 

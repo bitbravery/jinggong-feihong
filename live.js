@@ -3,6 +3,9 @@ let lastBatch=null;
 const collapsedDays=new Set();
 const historyPicked=new Set();let historyBusy=false;
 const historyQueued=new Set();let historyRunning='';
+// 本轮查询的序号：iso → 第几个；historyTotal 是本轮总数（每轮从 1 开始）
+const historySeq=new Map();let historyTotal=0;
+
 try{const saved=JSON.parse(localStorage.getItem('feihong-history-days')||'[]');if(Array.isArray(saved))saved.forEach(d=>collapsedDays.add(String(d)));}catch{}
 document.getElementById('changeDialog').addEventListener('close',()=>{changeBatchSummary.textContent='';document.getElementById('cancelChange').textContent='取消';document.querySelector('#changeForm button[type="submit"]').hidden=false;});
 function renderStage(){const el=$('changeStage');if(!el)return;el.textContent=stageText+(writeStarted?'（'+Math.round((performance.now()-writeStarted)/1000)+' 秒）':'');}
@@ -54,7 +57,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.184')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.185')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -119,9 +122,9 @@ function view(v){const bar=$('selectionBar');if(bar)bar.hidden=true;if(document.
 function openChange(ids){pending=orders().filter(o=>ids.includes(o.id)&&!o.duplicateOrder);if(!pending.length)return;
  const pendingFlow=pending.filter(o=>o.flow==='待办');
  if(pendingFlow.length){toast('选中的 '+pendingFlow.length+' 单还在“待办”：请先在原站「批量处理 → 通过」，变成已办并进入良乡申请寄件后，才能改物流状态。');return;}writePhase='idle';writeStarted=performance.now();if(!stageTimer)stageTimer=setInterval(renderStage,500);setStage('尚未提交，可随时取消。');$('cancelChange').disabled=false;$('closeChange').disabled=false;$('changeSummary').innerHTML=pending.map(o=>'<div class="cs-row" data-row="'+E(o.id)+'">'+E(o.id)+' · '+E(o.sender)+' → '+E(o.receiver)+' · '+E(o.status)+'<span class="cs-state" data-state="'+E(o.id)+'">待处理</span></div>').join('');$('targetStatus').innerHTML='<option value="">请选择目标状态</option>'+statuses.map(s=>'<option>'+E(s)+'</option>').join('');
- $('targetStatus').value='';$('changeReason').value='';$('changeForm').querySelector('button[type="submit"]').disabled=!FeiHongWritePolicy.allowed(pending);$('batchCount').textContent=pending.length;$('changeDialog').showModal();}
+ const pick=$('targetStatus');pick.dataset.value='';pick.querySelectorAll('input[type=radio]').forEach(r=>{r.checked=false;});$('changeReason').value='';$('changeForm').querySelector('button[type="submit"]').disabled=!FeiHongWritePolicy.allowed(pending);$('batchCount').textContent=pending.length;$('changeDialog').showModal();}
 async function submit(e){
- e.preventDefault();if(busy||!pending.length)return;if(statusBusy){toast('正在批量查看原站状态（'+Math.min(statusDone+1,statusTotal)+'/'+statusTotal+'），原站一次只能做一件事：请等它结束后再提交修改。');return;}if(!FeiHongWritePolicy.allowed(pending)){toast('所选记录含无效单号或重复单，禁止提交。');return;}const target=$('targetStatus').value;if(!statuses.includes(target)){toast('请先选择目标状态，再提交。');$('targetStatus').focus();return;}
+ e.preventDefault();if(busy||!pending.length)return;if(statusBusy){toast('正在批量查看原站状态（'+Math.min(statusDone+1,statusTotal)+'/'+statusTotal+'），原站一次只能做一件事：请等它结束后再提交修改。');return;}if(!FeiHongWritePolicy.allowed(pending)){toast('所选记录含无效单号或重复单，禁止提交。');return;}const target=$('targetStatus').dataset.value||'';if(!statuses.includes(target)){toast('请先选择目标状态，再提交。');const first=$('targetStatus').querySelector('input[type=radio]');if(first)first.focus();return;}
  const targets=pending.filter(o=>o.status!==target);if(!targets.length){toast('目标与当前状态相同，无需提交。');return;}
  busy=true;writePhase='preparing';setStage('正在核对原站；此阶段可以取消，取消后不会提交。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
  const batchStartedAt=performance.now(),batchId='b'+Date.now();$('changeBatchSummary').textContent='正在提交申请，请耐心等待；批量修改期间请勿操作原站或扩展（需要人工清理时按提示操作）。';
@@ -243,7 +246,8 @@ function renderHistory(){
    const mismatch=FeiHongAudit.mismatch(h),unreadable=/^取不到/.test(h.currentStatus||'');
    const live=h.currentStatus?`<small class="history-live${mismatch?' bad':''}${unreadable?' unknown':''}" title="${mismatch?'原站状态与本次改为的目标状态不一致':unreadable?'没有查到原站状态':'原站状态与本次目标一致'}">原站现为：${E(h.currentStatus)}${h.checkedAt?' · '+E(h.checkedAt.slice(5,16)):''}${mismatch?'（≠目标）':''}</small>`:'';
    const revertCell=h.reverted?'<button class="button reverted" disabled>已改回原状态</button>':FeiHongAudit.canRevert(h)?`<button class="button primary" data-revert="${E(h.id)}" data-from="${E(h.from)}" data-to="${E(h.to)}" data-key="${E(h.iso)}">改回原状态</button>`:'<button class="button" disabled title="这次没有改成功，原站状态没变，无需改回">无需改回</button>';
-   const actions=`${revertCell}${historyRunning===h.iso?'<button class="button" disabled>查询中…</button>':historyQueued.has(h.iso)?'<button class="button" disabled>排队中…</button>':`<button class="button" data-status="${E(h.id)}" data-key="${E(h.iso)}">查看原站状态</button>`}`;
+   const sSeq=historySeq.get(h.iso)||0,sLabel=historyRunning===h.iso?('查询中 '+sSeq+'/'+historyTotal):(historyQueued.has(h.iso)?('排队中 '+sSeq+'/'+historyTotal):'');
+ const actions=`${revertCell}${sLabel?`<button class="button" disabled>${sLabel}</button>`:`<button class="button" data-status="${E(h.id)}" data-key="${E(h.iso)}">查看原站状态</button>`}`;
    return batchHead+`<tr><td class="history-check"><input type="checkbox" data-pick="${E(h.iso)}" aria-label="选择 ${E(h.id)}" ${historyPicked.has(h.iso)?'checked':''}></td><td class="history-time" title="${E(h.time)}">${E((h.time||'').slice(5,16))}</td><td class="history-id">${E(h.id)}<small>${sender||receiver?E(sender||'—')+' → '+E(receiver||'—')+(campus?' · '+E(campus):''):''}</small></td><td>${E(h.from)} → ${E(h.to)}${live}</td><td class="history-actions">${actions}</td><td class="history-note" title="${E(h.action+' · '+h.result+(note?' · '+note:''))}">${badges}<span class="history-result">${E(h.result)}</span>${note?'<details><summary>展开详情</summary>'+E(note)+'</details>':''}</td></tr>`;
   }).join('');
  }).join('');
@@ -482,7 +486,7 @@ function openPrint(id){
  $('printForm').innerHTML=printFormHtml(o);
  $('printDialog').showModal();
 }
-const PRINT_CSS='@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{margin:0;color:#111;font:12px/1.7 "Microsoft YaHei",system-ui,sans-serif}.pf-title{text-align:center;font-size:26px;font-weight:600;margin:2px 0 6px}.pf-no{text-align:center;font-size:17px;font-weight:600;letter-spacing:.5px;margin:0 0 14px}.pf-sec{background:#e7ebef;border-left:5px solid #2f6fb3;padding:6px 12px;margin:12px 0 6px;font-size:14px;font-weight:600}.pf-table{width:100%;border-collapse:collapse;margin:0 0 6px;table-layout:fixed}.pf-table col.c1{width:16%}.pf-table col.c2{width:34%}.pf-table col.c3{width:16%}.pf-table col.c4{width:34%}.pf-table th,.pf-table td{border:1px solid #222;padding:9px 12px;font-size:16px;font-weight:400}.pf-table th{white-space:nowrap;text-align:center;background:#fafafa}.pf-table td{text-align:left}.pf-tip-title{margin:10px 0 4px;font-size:12px;font-weight:400}.pf-tip{margin:3px 0;font-size:12px;font-weight:400;line-height:1.8}';
+const PRINT_CSS='@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box}body{margin:0;color:#111;font:14.4px/1.7 "Microsoft YaHei",system-ui,sans-serif}.pf-title{text-align:center;font-size:31px;font-weight:600;margin:2px 0 7px}.pf-no{text-align:center;font-size:20px;font-weight:600;letter-spacing:.6px;margin:0 0 17px}.pf-sec{background:#e7ebef;border-left:5px solid #2f6fb3;padding:7px 14px;margin:14px 0 7px;font-size:17px;font-weight:600}.pf-table{width:100%;border-collapse:collapse;margin:0 0 7px;table-layout:fixed}.pf-table col.c1{width:20%}.pf-table col.c2{width:30%}.pf-table col.c3{width:20%}.pf-table col.c4{width:30%}.pf-table th,.pf-table td{border:1px solid #222;padding:11px 14px;font-size:19px;font-weight:400}.pf-table th{white-space:nowrap;text-align:center;background:#fafafa}.pf-table td{text-align:left}.pf-tip-title{margin:12px 0 5px;font-size:14.4px;font-weight:400}.pf-tip{margin:4px 0;font-size:14.4px;font-weight:400;line-height:1.8}';
 function nextExportName(){
  const d=new Date();
  const ymd=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
@@ -507,6 +511,15 @@ $('printNow').onclick=()=>printHtml($('printForm').innerHTML);
 $('printClose').onclick=()=>$('printDialog').close();
 $('rows').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.change)openChange([b.dataset.change]);if(b.dataset.print){openPrint(b.dataset.print);return;}
  if(b.dataset.original){try{await request({type:'openFlow'});toast('已切回原站流程，请核对单号 '+b.dataset.original+' 后办理。审核不自动标记为揽件。');}catch(e){toast(e.message);}}if(b.dataset.detail){const o=orders().find(o=>o.recordKey===b.dataset.detail);$('detailContent').innerHTML=Object.entries(o).filter(([k])=>!['history'].includes(k)).map(([k,v])=>`<p>${E(k)}：${E(v)}</p>`).join('');$('detailDialog').showModal();}};
+// 目标状态点选：五个状态并排，点击圆点选中（与门户“调整物流信息”一致）
+(function initStatusPicker(){
+ const box=$('targetStatus');
+ if(!box)return;
+ box.innerHTML=statuses.map(s=>'<label class="status-option"><input type="radio" name="targetStatus" value="'+E(s)+'"><span>'+E(s)+'</span></label>').join('');
+ box.addEventListener('change',e=>{
+  if(e.target&&e.target.name==='targetStatus')box.dataset.value=e.target.value;
+ });
+})();
 $('changeForm').onsubmit=submit;async function cancelChange(){if(writePhase==='submitted')return;if(writePhase==='preparing'){writePhase='cancelling';setStage('正在取消，原站不会提交…');$('cancelChange').disabled=true;await request({type:'cancelWrite'}).catch(()=>{});return;}$('changeDialog').close();}for(const id of ['closeChange','cancelChange'])$(id).onclick=cancelChange;$('changeDialog').addEventListener('cancel',e=>{e.preventDefault();cancelChange();});$('closeDetail').onclick=()=>$('detailDialog').close();
 for(const id of ['historySearch','historyFrom','historyTo'])$(id).oninput=renderHistory;$('historyRows').onchange=e=>{
  const iso=e.target.dataset.pick;
@@ -539,8 +552,11 @@ function statusButtonLabel(){
 function enqueueStatus(rows){
  const queued=new Set(statusQueue.map(x=>x.iso));
  let added=0;
+ if(!statusBusy&&!statusQueue.length){historySeq.clear();historyTotal=0;}
  for(const h of rows){
   if(!h||!h.iso||queued.has(h.iso))continue;
+  historyTotal++;
+  historySeq.set(h.iso,historyTotal);
   statusQueue.push({iso:h.iso,row:h});queued.add(h.iso);historyQueued.add(h.iso);added++;
  }
  statusTotal=statusDone+statusQueue.length;
@@ -554,6 +570,7 @@ async function pumpStatus(){
  try{
   while(statusQueue.length){
    const item=statusQueue[0],row=item.row;
+    historyRunning=item.iso;historyQueued.delete(item.iso);renderHistory();
    statusButtonLabel();
    // 改状态/改回/读取进行中时不插队：原站一次只做一件事。
    while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
@@ -566,11 +583,12 @@ async function pumpStatus(){
    }catch(err){
     row.currentStatus='取不到（'+String(err.message||'').slice(0,30)+'）';row.checkedAt=formatTime(new Date());
    }
-   statusQueue.shift();statusDone++;
+   statusQueue.shift();statusDone++;historyRunning='';
    save();renderHistory();
   }
  }finally{
-  statusBusy=false;
+statusBusy=false;historyRunning='';historyQueued.clear();historySeq.clear();historyTotal=0;
+   try{renderHistory();}catch{}
   const btn2=$('batchStatusCheck');if(btn2)btn2.disabled=false;
   statusButtonLabel();
   try{localStorage.setItem('feihong-history-days',JSON.stringify([...collapsedDays]));}catch{}

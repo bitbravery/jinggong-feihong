@@ -61,7 +61,7 @@ const render=(audit,picked=[])=>{
  const nodes=new Map();
  const mk=()=>{const n={value:'',checked:false,indeterminate:false,disabled:false,hidden:false,textContent:'',dataset:{}};Object.defineProperty(n,'innerHTML',{set(v){n._html=v;},get(){return n._html||'';}});return n;};
  const $=id=>{if(!nodes.has(id))nodes.set(id,mk());return nodes.get(id);};
- const ctx={$,audit,records:{query:[],flow:[]},collapsedDays:new Set(),historyPicked:new Set(picked),historyQueued:new Set(),historyRunning:'',
+ const ctx={$,audit,records:{query:[],flow:[]},collapsedDays:new Set(),historyPicked:new Set(picked),historyQueued:new Set(),historyRunning:'',historySeq:new Map(),historyTotal:0,
   FeiHongAudit:A,E:s=>String(s??''),timingText:()=>'',Date,Map,Set,Number,String,JSON};
  vm.createContext(ctx);
  vm.runInContext(live.slice(live.indexOf('function renderHistory(){'),live.indexOf("$('officeKeywords').value=officeKeywords.join"))+'renderHistory();',ctx);

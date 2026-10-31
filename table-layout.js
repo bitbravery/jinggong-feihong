@@ -1,5 +1,8 @@
 (()=>{
  const table=document.getElementById('parcelTable'),cols=[...table.querySelectorAll('col')],headers=[...table.querySelectorAll('th')],density=document.getElementById('tableDensity');
+ const fontSel=document.getElementById('tableFont'),fontCustom=document.getElementById('tableFontCustom');
+ const fontSizeOf=()=>Number(fontSel&&fontSel.value==='custom'?(fontCustom&&fontCustom.value||14):(fontSel&&fontSel.value||14))||14;
+ function applyFont(){const px=Math.min(24,Math.max(10,fontSizeOf()));document.documentElement.style.setProperty('--table-fs',px+'px');}
  const freezeInputs=[...document.querySelectorAll('[data-freeze]')],panel=document.getElementById('parcelPanel');
  const freezeKey='feihong-freeze-rows-v1';let frozen={};try{frozen=JSON.parse(localStorage.getItem(freezeKey))||{};}catch{}
  function updateFreeze(){let offset=0;for(const id of ['statusRow','queryRow']){const row=document.getElementById(id),enabled=freezeInputs.find(i=>i.dataset.freeze===id).checked;row.classList.toggle('pinned-row',enabled);row.style.top=enabled?offset+'px':'auto';if(enabled)offset+=row.getBoundingClientRect().height;}
@@ -9,9 +12,9 @@
  const ratios=[.035,.045,.17,.15,.24,.11,.10,.15],key='feihong-table-layout-v3';let autoFit=true,widths=[];
  function defaults(){const available=Math.max(700,table.parentElement.clientWidth||1100);const values=ratios.map(r=>Math.floor(available*r));values[7]+=available-values.reduce((a,b)=>a+b,0);return values;}
  widths=defaults();
- function save(){try{localStorage.setItem(key,JSON.stringify({widths,density:density.value,autoFit}));}catch{}}
+ function save(){try{localStorage.setItem(key,JSON.stringify({widths,density:density.value,autoFit,font:fontSel.value,fontCustom:fontCustom.value}));}catch{}}
  function apply(){cols.forEach((c,i)=>c.style.width=widths[i]+'px');table.style.width=widths.reduce((a,b)=>a+b,0)+'px';table.dataset.density=density.value;}
- try{const saved=JSON.parse(localStorage.getItem(key));if(saved?.autoFit===false&&saved?.widths?.length===8&&saved.widths.every(w=>Number.isFinite(w)&&w>=40&&w<=900)){widths=saved.widths;autoFit=false;}if(['compact','standard','loose'].includes(saved?.density))density.value=saved.density;}catch{}
+ try{const saved=JSON.parse(localStorage.getItem(key));if(saved?.autoFit===false&&saved?.widths?.length===8&&saved.widths.every(w=>Number.isFinite(w)&&w>=40&&w<=900)){widths=saved.widths;autoFit=false;}if(['compact','standard','loose'].includes(saved?.density))density.value=saved.density;if(saved&&saved.font){fontSel.value=saved.font;if(saved.font==='custom'){fontCustom.hidden=false;fontCustom.value=saved.fontCustom||14;}}}catch{}
  headers.forEach((th,i)=>{
   const handle=document.createElement('span');handle.className='column-resizer';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','vertical');handle.setAttribute('aria-label','调整'+th.textContent+'列宽，左右方向键微调');th.append(handle);
   function resize(w){autoFit=false;widths[i]=Math.max(i===0?40:90,Math.min(900,w));apply();}
@@ -19,7 +22,10 @@
   handle.ondblclick=()=>{resize(defaults()[i]);save();};
   handle.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();resize(widths[i]+(e.key==='ArrowRight'?10:-10));save();}};
  });
- density.onchange=()=>{apply();save();};document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();apply();}}).observe(table.parentElement);apply();
+ density.onchange=()=>{apply();save();};
+ fontSel.onchange=()=>{fontCustom.hidden=fontSel.value!=='custom';if(fontSel.value==='custom'){fontCustom.focus();}applyFont();save();};
+ fontCustom.oninput=()=>{applyFont();save();};
+ applyFont();document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();apply();}}).observe(table.parentElement);apply();
 })();
 (()=>{
  // 历史表 6 列：勾选 / 修改时间 / 快件 / 原→新状态 / 处理 / 操作与结果（比例与 index.html 的 colgroup 一致）。

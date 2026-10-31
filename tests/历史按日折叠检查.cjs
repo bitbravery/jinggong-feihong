@@ -42,7 +42,7 @@ assert(/所选时间段内没有修改记录/.test(live),'空结果要说明');
   {id:'A',from:'已签收',to:'已送达',iso:'2026-10-25T13:48:00.000Z',time:'10-25 13:48',result:'已确认提交',action:'物流状态调整',currentStatus:'已送达',checkedAt:'10-25 13:50'},
   {id:'B',from:'已签收',to:'已送达',iso:'2026-10-24T09:10:00.000Z',time:'10-24 09:10',result:'准备失败，未提交',action:'物流状态调整'}
  ];
- const ctx={$:$,audit,records,collapsedDays:new Set(),historyPicked:new Set(),historyQueued:new Set(),historyRunning:'',localStorage:{getItem:()=>'[]',setItem(){}},
+ const ctx={$:$,audit,records,collapsedDays:new Set(),historyPicked:new Set(),historyQueued:new Set(),historyRunning:'',historySeq:new Map(),historyTotal:0,localStorage:{getItem:()=>'[]',setItem(){}},
   // v0.9.176 契约变化：渲染改用 audit-history.js 的筛选/分类/北京时间分日，这里加载真实文件而不是只给 within 的替身
   FeiHongAudit:require('../audit-history.js'),E:s=>String(s??''),formatTime:()=>'10-25 13:50',toast(){},request:async()=>({status:'已送达'}),Date,Map,Set,Number,String,JSON};
  vm.createContext(ctx);
