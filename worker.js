@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.195';
+const COMPONENT_VERSION = '0.9.194';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -25,10 +25,11 @@ async function formOrder(id){
  const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法读取原站状态。');return found[0];};
  let portal=await readPortal();
  if(!portal.service)throw Error('原站未打开“京工飞鸿两校快件系统”标签。');
- if(portal.forms>0){
-  for(let i=0;i<4&&portal.forms>0;i++){await run({type:'closeFormTab'}).catch(()=>{});portal=await readPortal();if(portal.forms>0)await pause(100);}
- }
- const reuseTab=portal.forms>0;
+ let reuseTab=false;
+ if(portal.forms>0){await pause(1500);portal=await readPortal();}
+ if(portal.forms>0){await waitSaved();portal=await readPortal();}
+ for(let i=0;i<4&&portal.forms>0;i++){await run({type:'closeFormTab'}).catch(()=>{});await pause(500);portal=await readPortal();}
+ if(portal.forms>0)reuseTab=true;
  if(!reuseTab){
   await navigate('service');
   await waitSource({type:'openForm'},'openRequested','原站物流状态调整单入口未加载完成');
@@ -304,7 +305,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const before=String(hit.before||'');
      const end=Date.now()+8000;let changed=false,ids=before;
      while(Date.now()<end){
-      await pause(150);
+       await pause(400);
        const list=(await run({type:'flowRowIds'})).map(r=>r.ids).filter(v=>typeof v==='string');
        if(!list.length)continue;
        ids=list[0];
@@ -330,7 +331,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      step='等待列表出现';
      let listed=false;try{await waitSnapshot('flow',s=>Array.isArray(s.rows)&&s.rows.length>0,'原站待办列表','待办',15000);listed=true;}catch{}
      if(!listed)throw Error('原站“待办”列表 15 秒内没有出现');
-      await pause(150);
+     await pause(400);
      step='清空原站勾选';
      await run({type:'flowClearSelection'});
      step='勾选单据';
@@ -366,7 +367,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      while(Date.now()<end){
       const c=await run({type:'flowDialogOk'});
       if(c.some(r=>r.ok)){confirmed=true;break;}
-      await pause(150);
+      await pause(400);
      }
      return {count:msg.ids.length,action,confirmed,step:'完成'};
     }catch(err){
@@ -450,25 +451,37 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      let reuse=false;
      const preAlert=(await run({type:'formAlert'}).catch(()=>[])).find(r=>r&&r.alert);
      if(preAlert)stage('已关闭上一单残留的门户提示：'+preAlert.alert.slice(0,40));
-      if(portal.forms>0){
-        stage('关闭残留的调整单标签（'+portal.forms+' 张）…');
-        for(let i=0;i<4&&portal.forms>0;i++){
-          try{await run({type:'closeFormTab'});}catch{}
-          check();
-          portal=await readPortal();
-          if(portal.forms>0)await pause(100);
-        }
-        if(portal.forms>0)throw Error('残留的“物流状态调整单”标签关不掉（'+portal.forms+' 张），本单未提交；请手动关闭后再试。');
-      }
-      // 残留的“您确定要提交吗”框：点到关为止，最多两次；仍关不掉才报错（不再等 2 分钟）
-      for(let t=0;t<2;t++){
-        const left=(await run({type:'confirmResidue'}).catch(()=>[])).reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
-        if(!left)break;
-        stage('清理上一次遗留的确认框…');
-        try{await run({type:'confirmDismiss'});}catch{}
-        await pause(150);
-        if(t===1)throw Error('残留的“您确定要提交吗”确认框关不掉，本单未提交；请在原站点一次「取消」后再试。');
-      }
+     if(portal.forms>0){
+       // 门户提交成功后会自动关闭调整单标签，先给它 1.5 秒
+       stage('等待门户关闭上一单的调整单标签…');
+       {const we=Date.now()+1500;while(Date.now()<we){portal=await readPortal();if(!portal.forms)break;await pause(150);}}
+       if(portal.forms>0&&await portalSaving()){await waitSaved(stage,check);portal=await readPortal();}
+     }
+     for(let i=0;i<4&&portal.forms>0;i++){
+       stage('关闭遗留的调整单标签（'+portal.forms+' 张）…');
+       const out=await run({type:'closeFormTab'});const bad=out.find(r=>r.error);if(bad)break;check();await pause(500);
+       portal=await readPortal();
+     }
+     if(portal.forms>0){
+       stage('已暂停：请到原站取消残留确认框并手动关闭调整单标签；关闭后自动继续，可取消本批次。');
+       const manualEnd=Date.now()+120000;
+       while(portal.forms>0&&Date.now()<manualEnd){check();await pause(500);portal=await readPortal();}
+       if(portal.forms>0)throw Error('等待手动关闭调整单超过 120 秒，本单未提交。');
+     }
+     const resi=await run({type:'confirmResidue'}).catch(()=>[]);
+     const left=resi.reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
+     if(left){
+       stage('清理上一次遗留的确认框…');
+       await run({type:'confirmDismiss'}).catch(()=>{});
+       await pause(300);
+       const again=(await run({type:'confirmResidue'}).catch(()=>[])).reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
+       if(again){
+         stage('已暂停：请到原站点「取消」关闭上一单确认框；关闭后自动继续，可取消本批次。');
+         const manualEnd=Date.now()+120000;let remaining=again;
+         while(remaining&&Date.now()<manualEnd){check();await pause(500);remaining=(await run({type:'confirmResidue'})).reduce((m,r)=>Math.max(m,r?.residue||0),0);}
+         if(remaining)throw Error('等待手动关闭确认框超过 120 秒，本单未提交。');
+       }
+     }
      mark('portal');
      if(reuse){
        stage('切换到现有调整单标签…');
@@ -559,7 +572,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       stage('确认未返回，先清理残留确认框…');
       let cleaned=0;
       try{const d=await run({type:'confirmDismiss'});cleaned=d.reduce((m,r)=>m+((r&&r.dismissed)||0),0);}catch{}
-      await pause(150);
+      await pause(400);
       stage('正在按单号回读原站…');
       let rb=null,now='';
       try{rb=await queryOne(msg.order.id,{allowEmpty:true});}catch{}
@@ -570,10 +583,18 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       throw Error(e.message+(now?'；已回读原站，当前状态是「'+now+'」，未到「'+msg.target+'」':'；回读未取到该单状态')+(cleaned?'；已尝试关闭残留确认框 '+cleaned+' 次':'')+(extra?'（'+extra+'）':'')+open+staleNote+'；'+(await pressNote(confirmToken)));
     }
     mark('confirmed');
-     stage('确认已返回，继续下一单（残留标签会在下一单开始前直接关闭）');
+    stage('确认已返回，等待原站关闭调整单标签…');
     if(confirmHit&&confirmHit.submissionComplete){mark('settled');stage('调整单标签已关闭，按已提交处理');return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'tabclosed',verified:false,timing,basis:'调整单标签已自动关闭',staleToast,presses:await pressNote(confirmToken)};}
-     // 确认成功后不再等门户关标签：下一单准备阶段会直接关掉残留的调整单
-
+    // 确认成功后，门户会在稍后自动关掉调整单标签；等它关掉再进入下一单，
+    // 否则下一单的准备阶段会看到“残留 1 张”，去点它反而把标签卡住。
+    try{
+      const closeEnd=Date.now()+2500;
+      while(Date.now()<closeEnd){
+        const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];
+        if(!st||st.forms===0)break;
+        await pause(120);
+      }
+    }catch{}
     mark('settled');stage('已提交');
     return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'confirmed',timing,basis:'看到“提交成功”',staleToast,presses:await pressNote(confirmToken)};
    }
@@ -592,10 +613,9 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法改回。');return found[0];};
     let portal=await readPortal();
     if(!portal.service)throw Error('原站未打开“京工飞鸿两校快件系统”标签，请先打开该业务标签。');
-     if(portal.forms>0){
-      for(let i=0;i<4&&portal.forms>0;i++){stage('关闭遗留的调整单标签…');try{await run({type:'closeFormTab'});}catch{}portal=await readPortal();if(portal.forms>0)await pause(100);}
-      if(portal.forms>0)throw Error('门户内仍有调整单标签关不掉，请手动关闭后再试。');
-     }
+    if(portal.forms>0){await waitSaved(stage);portal=await readPortal();}
+    for(let i=0;i<6&&portal.forms>0;i++){stage('关闭遗留的调整单标签…');await run({type:'closeFormTab'});await pause(300);portal=await readPortal();}
+    if(portal.forms>0)throw Error('门户内仍有调整单标签关不掉，请手动关闭后再试。');
     stage('打开业务介绍页的办理入口…');
     await navigate('service');
     await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成');
@@ -656,7 +676,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const list=await chrome.tabs.query({currentWindow:true});
      newTab=list.find(t=>!tabsBefore.has(t.id));
      if(newTab){await chrome.tabs.update(newTab.id,{active:true}).catch(()=>{});break;}
-      await pause(150);
+     await pause(400);
     }
     return {opened:true,newTab:!!newTab};
    }

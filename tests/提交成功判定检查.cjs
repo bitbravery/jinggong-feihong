@@ -50,7 +50,7 @@ function worker(scn){
  ctx.fakeRun=async c=>{log.push(c.type);
   if(c.type==='portalBusy')return [{busy:saving(),path:'/EIP/x/openCooperative.htm'},{busy:false,path:'/EIP/x/framework.htm'}];
   if(c.type==='portalState')return [{tabs:['京工飞鸿两校快件系统'],forms:scn.leftoverForm&&saving()?1:0,service:true}];
-  if(c.type==='closeFormTab'){if(saving())log.push('在保存中关标签！');scn.leftoverForm=false;return [{closed:1}];}
+  if(c.type==='closeFormTab'){if(saving())log.push('在保存中关标签！');return [{closed:1}];}
   if(c.type==='navigate')return [{navigated:true}];if(c.type==='openForm')return [{openRequested:true}];
   if(c.type==='prepare')return [{prepared:true}];if(c.type==='inspect')return [{matched:true,current:'订单申请'}];
   if(c.type==='toastMark')return [{toastMarked:true,visible:scn.stale||0},{toastMarked:true,visible:0}];
@@ -93,11 +93,10 @@ function worker(scn){
  assert(!w.res.ok);assert.match(w.res.error,/保存超过 90 秒仍在“加载中”，提交结果不明，勿重复提交/);
  assert(!/已回读原站，当前状态是/.test(w.res.error),'不得给出会触发自动重试的回读结论');
  assert(!w.log.includes('queryField'),'卡在加载中时不得去回查');
- // 准备下一单时上一张调整单还开着：直接关掉，不再等它保存完（用户要求）
+ // 准备下一单时上一张调整单还在保存：先等保存完，不去关它
  w=await worker({busyUntil:20000,leftoverForm:true,toast:true});
- assert(w.res.ok,w.res.error);
- assert(w.log.includes('closeFormTab'),'准备阶段要先关掉残留的调整单标签');
- assert(!w.log.includes('portalBusy'),'准备阶段不再查询“是否仍在保存”');
+ assert(w.res.ok,w.res.error);assert(!w.log.includes('在保存中关标签！'),'准备阶段不得关正在保存的调整单');
+ assert(w.log.indexOf('portalBusy')<w.log.indexOf('prepare'),'准备前要先确认上一单保存完成');
  // 注入层：看得见的“加载中”遮罩算保存中
  {const mk=(cls,txt,h)=>({className:cls,innerText:txt,getBoundingClientRect:()=>({height:h,width:h?100:0})});
   const run=els=>{const c={module:{exports:{}},window:{},location:{origin:'https://ehall.bit.edu.cn',pathname:'/EIP/x/openCooperative.htm',href:''},URL,document:{querySelectorAll:s=>s==='.mini-mask-loading'?els.filter(e=>e.className==='mini-mask-loading'):s==='div,span'?els:[]}};vm.createContext(c);vm.runInContext(src,c);return c.module.exports.sourceAction({type:'portalBusy'});};
