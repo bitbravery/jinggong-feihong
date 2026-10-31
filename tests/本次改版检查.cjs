@@ -51,4 +51,15 @@ assert(/historySeq=new Map\(\)/.test(live)&&/historyTotal=0/.test(live),'要有�
 assert(/\('查询中 '\+sSeq\+'\/'\+historyTotal\)/.test(live),'运行中显示“查询中 k/n”');
 assert(/\('排队中 '\+sSeq\+'\/'\+historyTotal\)/.test(live),'排队中显示“排队中 m/n”');
 assert(/historySeq\.clear\(\)/.test(live)&&/historyTotal=0/.test(live),'一轮结束后序号复位');
+
+// 补充（v0.9.188）：五等分色块 + 不再有“请选择目标状态”占位
+assert(!html.includes('请选择目标状态'),'不应再有“请选择目标状态”占位');
+assert(/grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/.test(css),'五个状态要等分五列');
+assert(/\.status-option\{position:relative;display:flex/.test(css),'每个状态是一块可点单元格');
+assert(/\.status-glider\{[^}]*background:var\(--green\)/.test(css),'选中底纹用滑动块呈现（深绿）');
+assert(/transform:translateX\(calc\(var\(--i,0\) \* 100%\)\)/.test(css),'滑动块按选中索引移动');
+assert(/transition:transform \.26s/.test(css),'滑动要有过渡动画');
+assert(/\.status-option:has\(input:checked\)\{color:#fff/.test(css),'选中文字变白');
+assert(/\.status-picker\{[^}]*background:#eaf4ef/.test(css),'未选中时是浅绿底');
+assert(!/targetStatus'\)\.innerHTML=/.test(live),'打开弹窗时不得再用 innerHTML 覆盖点选控件');
 console.log('通过：v0.9.185 六项改版（卡片相邻/打印 2:3+120%/状态点选/表格字号/历史提示/查询进度）。');
