@@ -624,33 +624,53 @@ function sourceAction(command){
    const de=document.documentElement||{};
    return {frame:true,path:p,total:summary?Number(summary[1]):null,count:rows.length,first:rows[0]?String(text(rows[0].children[2])||''):'',size:[de.clientWidth,de.clientHeight]};
  }
- if(command.type==='flowDate'){
-   const p=location.pathname;
-   if(!/List\.htm$/i.test(p))return null;
-   // 只在正在显示的分类页里操作：隐藏的待办/已办/抄送页也会收到这条命令
-   try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return null;}}catch{}
-   const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
-   const label=Array.from(document.querySelectorAll('td,th,label,span,div')).find(el=>/发起日期/.test(text(el))&&vis(el));
-   if(!label)return {error:'流程页没有找到“发起日期”条件，请先点原站“展开查询”。'};
-   let box=label.closest('tr')||label.parentElement;
-   let inputs=Array.from(box.querySelectorAll('input'));
-   if(inputs.length<2){const panel=label.closest('.mini-panel,.query-box,.search-box')||box.parentElement;inputs=Array.from(panel.querySelectorAll('input')).filter(i=>i.offsetParent!==null);}
-   if(inputs.length<2)return {error:'“发起日期”附近没有找到两个日期框。'};
-   // 先找查询按钮，找到了才填日期（以前先填后找，找不到时已改动了原站日期框）
-   const caption=el=>String(el.tagName==='INPUT'?el.value:text(el)).replace(/\s+/g,'');
-   const clickables=Array.from(document.querySelectorAll('button,a,span,input[type="button"],input[type="submit"]')).filter(vis);
-   const btn=clickables.find(el=>/^(查询|搜索)$/.test(caption(el)));
-   if(!btn){
-     const seen=[...new Set(clickables.map(caption).filter(t=>t&&t.length<=8))].slice(0,20);
-     return {error:'流程页没有找到“查询”按钮，日期条件未填入。页面上能点的有：'+(seen.join('、')||'无')+'。请告诉维护者人工选好日期后是点哪里开始查询的。'};
-   }
-   // 按 MiniUI 控件写值（与快件查询页的做法相同），并核对确实写进去了
-   const setDate=(el,v)=>{const w=window.mini?.get?.(String(el.id||'').replace(/\$text$/,''));if(w?.setValue){w.setValue(v);}else{try{const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;d.call(el,v);}catch{el.value=v;}el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));el.dispatchEvent(new Event('blur',{bubbles:true}));}return String(el.value||'').trim().slice(0,10)===v;};
-   if(!setDate(inputs[0],command.from)||!setDate(inputs[1],command.to))return {error:'发起日期没有写进原站日期框（当前为“'+String(inputs[0].value||'')+'”至“'+String(inputs[1].value||'')+'”），未查询。'};
-   const rows=Array.from(document.querySelectorAll('tr[id^="line_"],tr.mini-grid-row')).map(r=>r.id).join(',');
-   btn.click();
-   return {queried:true,before:rows};
- }
+  if(command.type==='flowDate'){
+    const p=location.pathname;
+    if(!/List\.htm$/i.test(p))return null;
+    // 只在正在显示的分类页里操作：隐藏的待办/已办/抄送页也会收到这条命令
+    try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return null;}}catch{}
+    const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
+    const rowIds=()=>Array.from(document.querySelectorAll('tr[id^="line_"],tr.mini-grid-row')).map(r=>r.id).join(',');
+    const label=Array.from(document.querySelectorAll('td,th,label,span,div')).find(el=>/发起日期/.test(text(el))&&vis(el));
+    if(!label){
+      // 查询区默认是收起的：先点“展开查询”，下一次调用再填日期
+      const exp=Array.from(document.querySelectorAll('a,span,div,button')).filter(vis).find(el=>/^展开查询$/.test(text(el)));
+      if(exp){exp.click();return {expanded:true};}
+      return {error:'流程页没有找到“发起日期”，也没有找到“展开查询”按钮。'};
+    }
+    let box=label.closest('tr')||label.parentElement;
+    let inputs=Array.from(box.querySelectorAll('input'));
+    if(inputs.length<2){const panel=label.closest('.mini-panel,.query-box,.search-box')||box.parentElement;inputs=Array.from(panel.querySelectorAll('input')).filter(i=>i.offsetParent!==null);}
+    if(inputs.length<2)return {error:'“发起日期”附近没有找到两个日期框。'};
+    // 按 MiniUI 控件写值（与快件查询页的做法相同），并核对确实写进去了
+    const setDate=(el,v)=>{const w=window.mini?.get?.(String(el.id||'').replace(/\$text$/,''));if(w?.setValue){w.setValue(v);}else{try{const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;d.call(el,v);}catch{el.value=v;}try{el.dispatchEvent(new Event('input',{bubbles:true}));}catch{}try{el.dispatchEvent(new Event('change',{bubbles:true}));}catch{}}return String(el.value||'')===String(v);};
+    const before=rowIds();
+    if(!setDate(inputs[0],command.from)||!setDate(inputs[1],command.to))return {error:'发起日期没有写进原站日期框（当前为“'+String(inputs[0].value||'')+'”至“'+String(inputs[1].value||'')+'”），未查询。'};
+    const caption=el=>String(el.tagName==='INPUT'?el.value:text(el)).replace(/\s+/g,'');
+    const clickables=Array.from(document.querySelectorAll('button,a,span,input[type="button"],input[type="submit"]')).filter(vis);
+    const btn=clickables.find(el=>/^(查询|搜索)$/.test(caption(el)));
+    if(btn){btn.click();return {queried:true,via:'button',before};}
+    // 没有独立“查询”按钮的版本：改完日期发 change/回车，让门户自己触发查询
+    for(const el of inputs){try{el.dispatchEvent(new Event('change',{bubbles:true}));}catch{}}
+    try{inputs[1].dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,which:13,bubbles:true}));}catch{}
+    try{inputs[1].dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',keyCode:13,which:13,bubbles:true}));}catch{}
+    return {queried:true,via:'enter',before};
+  }
+  if(command.type==='flowRowIds'){
+    if(!/List\.htm$/i.test(location.pathname))return null;
+    try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return null;}}catch{}
+    return {ids:Array.from(document.querySelectorAll('tr[id^="line_"],tr.mini-grid-row')).map(r=>r.id).join(',')};
+  }
+  if(command.type==='flowQueryDump'){
+    if(!/List\.htm$/i.test(location.pathname))return null;
+    try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return null;}}catch{}
+    const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
+    const label=Array.from(document.querySelectorAll('td,th,label,span,div')).find(el=>/发起日期/.test(text(el))&&vis(el));
+    const box=label?(label.closest('tr')||label.parentElement):(Array.from(document.querySelectorAll('td,th,label,span,div')).find(el=>/展开查询|收起/.test(text(el))&&vis(el))||null);
+    const cap=el=>String(el.tagName==='INPUT'?el.value:text(el)).replace(/\s+/g,' ').trim().slice(0,14);
+    const els=Array.from(document.querySelectorAll('button,a,span,input[type="button"],input[type="submit"],img,i')).filter(vis).map(el=>({tag:String(el.tagName||'').toLowerCase(),cls:String(el.className||'').slice(0,28),t:cap(el)}));
+    return {queryDump:true,path:String(location.pathname.split('/').pop()),html:box?String(box.outerHTML||'').replace(/\s+/g,' ').slice(0,700):'',els:els.slice(0,40)};
+  }
  if(command.type==='flowSelect'){
    {const g=document.querySelector('tr[id^="line_"],tr.mini-grid-row');if(g&&g.offsetHeight===0)return null;}
    const rows=Array.from(document.querySelectorAll('tr[id^="line_"],tr.mini-grid-row'));

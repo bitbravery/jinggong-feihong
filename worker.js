@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.186';
+const COMPONENT_VERSION = '0.9.187';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -280,14 +280,35 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    if(msg.type==='page'){if(!['next','prev','first'].includes(msg.direction))throw Error('无效分页方向');await navigate('query');return readPage(msg.direction);}
    if(msg.type==='cancelFlow'){flowCancelled=true;return {cancelled:true};}
    if(msg.type==='flowFirst'){flowCancelled=false;flowBegin('读取前 N 页（'+msg.flowTab+'）');return flowFirst(msg.flowTab);}
-   if(msg.type==='flowDate'){
-    if(msg.flowTab)await ensureFlowTab(msg.flowTab);
-    const out=await run({type:'flowDate',from:msg.from,to:msg.to});
-    const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
-    if(!out.some(r=>r.queried))throw Error('流程页没有接受日期条件（可能没有“发起日期”查询项）。');
-    await pause(1500);
-    return {applied:true};
-   }
+    if(msg.type==='flowDate'){
+     if(msg.flowTab)await ensureFlowTab(msg.flowTab);
+     let out=await run({type:'flowDate',from:msg.from,to:msg.to});
+     if(out.some(r=>r.expanded)){
+       await pause(600);
+       out=await run({type:'flowDate',from:msg.from,to:msg.to});
+     }
+     const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
+     const hit=out.find(r=>r.queried);
+     if(!hit)throw Error('流程页没有接受日期条件（可能没有“发起日期”查询项）。');
+     const before=String(hit.before||'');
+     const end=Date.now()+8000;let changed=false,ids=before;
+     while(Date.now()<end){
+       await pause(400);
+       const list=(await run({type:'flowRowIds'})).map(r=>r.ids).filter(v=>typeof v==='string');
+       if(!list.length)continue;
+       ids=list[0];
+       if(ids!==before){changed=true;break;}
+     }
+     if(!changed){
+       let dump='';
+       try{const d2=(await run({type:'flowQueryDump'})).find(r=>r&&r.queryDump);
+         if(d2)dump='；查询区：'+(d2.html||'（未取到）')+'；可点元素：'+d2.els.map(e=>e.tag+(e.cls?'['+e.cls+']':'')+'“'+e.t+'”').join(' / ');
+       }catch{}
+       throw Error('日期已填入，但流程列表 8 秒内没有刷新（没找到会触发查询的按钮，回车也未生效）'+dump);
+     }
+     await pause(300);
+     return {applied:true,via:hit.via};
+    }
    if(msg.type==='bulkApprove'){
     if(!Array.isArray(msg.ids)||!msg.ids.length)throw Error('没有选中任何单号。');
     const action=msg.action==='reject'?'退回':'通过';
