@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.194')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.196')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -182,6 +182,13 @@ async function submit(e){
    setStage(tagText()+'状态修改成功，请等待全部改完后刷新原网站查看');toast('已提交 '+order.id,1500);setOrderState(order.id,'已改好','ok');
     }catch(err){
      if(/历史保存失败/.test(err.message))throw err;
+      // 原站一直卡在加载中：这一单记失败后不要继续硬改，停下来让用户去原站刷新
+      if(/仍在“加载中”|保存超过 90 秒|卡在加载中/.test(String(err.message||''))){
+       if(row){if(!/失败|不明|待核验|已取消/.test(String(row.result||'')))row.result='提交失败，未改成功';row.error=err.message;save();}
+       failures.push(order.id);setOrderState(order.id,'失败','bad');setOrderNote(order.id,err.message);
+       setStage('原站一直卡在加载中，已停止批量。');
+       throw new Error('原站一直卡在加载中（已处理 '+doneCount+'/'+targets.length+' 单）。请到原站刷新页面，确认不卡后再重新批量。');
+      }
      if(row){if(!/失败|不明|待核验|已取消/.test(String(row.result||'')))row.result='提交失败，未改成功';row.error=err.message;save();}
      failures.push(order.id);setOrderState(order.id,'失败','bad');setOrderNote(order.id,err.message);
      setStage(tagText()+'状态修改失败（'+String(err.message).slice(0,60)+'）');

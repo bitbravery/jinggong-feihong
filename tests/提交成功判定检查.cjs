@@ -67,11 +67,12 @@ function worker(scn){
 (async()=>{
  // 点确定后看到新的“提交成功”：成功，并写明依据与提交前的旧提示数
  let w=await worker({toast:true,stale:2});
- assert(w.res.ok,w.res.error);assert.equal(w.res.data.basis,'看到“提交成功”');assert.equal(w.res.data.staleToast,2);
+ assert(w.res.ok,w.res.error);assert.equal(w.res.data.basis,'提交成功+调整单自动关闭');assert.equal(w.res.data.staleToast,2);
  assert(w.log.indexOf('toastMark')>=0&&w.log.indexOf('toastMark')<w.log.indexOf('submit'),'点提交前要先给旧提示打标记');
- // 没看到提示，但调整单标签被门户自动关闭：成功
+ // 只有标签关闭、没有“提交成功”：按新口径不算成功（结果不明）
  w=await worker({tabClosed:true});
- assert(w.res.ok,w.res.error);assert.equal(w.res.data.basis,'调整单标签已自动关闭');
+ assert(!w.res.ok,'只关标签没有提交成功时不得记成功');
+ assert.match(w.res.error,/未看到提交成功/,'错误要说明缺少“提交成功”');
  // 两个信号都没有、回查仍是“订单申请”（复现现场那单）：不得报已改好，报出原站现状（工作台据此只重试一次）
  w=await worker({stale:1});
  assert(!w.res.ok,'没有任何成功信号时不得报已改好');
@@ -85,7 +86,7 @@ function worker(scn){
  // ---------- v0.9.178：原站点确定后“加载中”保存较久（现场：整页蒙灰两个“加载中…”）----------
  // 保存 40 秒才出“提交成功”：一直等；期间不回查、不重试、不关标签
  w=await worker({busyUntil:40000,toastAfterSave:true});
- assert(w.res.ok,w.res.error);assert.equal(w.res.data.basis,'看到“提交成功”');
+ assert(w.res.ok,w.res.error);assert.equal(w.res.data.basis,'提交成功+调整单自动关闭');
  assert(!w.log.includes('queryField'),'原站还在保存时不得去回查');
  assert(!w.log.includes('在保存中关标签！'),'不得在保存中途关调整单');
  // 一直卡在“加载中”：90 秒后报结果不明，不回查、不触发自动重试

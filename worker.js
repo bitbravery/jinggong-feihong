@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.194';
+const COMPONENT_VERSION = '0.9.196';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -451,22 +451,23 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      let reuse=false;
      const preAlert=(await run({type:'formAlert'}).catch(()=>[])).find(r=>r&&r.alert);
      if(preAlert)stage('已关闭上一单残留的门户提示：'+preAlert.alert.slice(0,40));
-     if(portal.forms>0){
-       // 门户提交成功后会自动关闭调整单标签，先给它 1.5 秒
-       stage('等待门户关闭上一单的调整单标签…');
-       {const we=Date.now()+1500;while(Date.now()<we){portal=await readPortal();if(!portal.forms)break;await pause(150);}}
-       if(portal.forms>0&&await portalSaving()){await waitSaved(stage,check);portal=await readPortal();}
+     // v0.9.196：加载中只等不关（关掉会中断保存、把门户卡在加载中）；保存结束后再关，最多 3 次
+     if(portal.forms>0&&await portalSaving()){
+       stage('上一单仍在保存，等它结束（不关标签）…');
+       await waitSaved(stage,check);
+       portal=await readPortal();
      }
-     for(let i=0;i<4&&portal.forms>0;i++){
-       stage('关闭遗留的调整单标签（'+portal.forms+' 张）…');
-       const out=await run({type:'closeFormTab'});const bad=out.find(r=>r.error);if(bad)break;check();await pause(500);
+     for(let i=0;i<3&&portal.forms>0;i++){
+       stage('关闭残留的调整单标签（'+portal.forms+' 张）…');
+       try{await run({type:'closeFormTab'});}catch{}
+       check();
+       await pause(300);
        portal=await readPortal();
      }
      if(portal.forms>0){
-       stage('已暂停：请到原站取消残留确认框并手动关闭调整单标签；关闭后自动继续，可取消本批次。');
-       const manualEnd=Date.now()+120000;
-       while(portal.forms>0&&Date.now()<manualEnd){check();await pause(500);portal=await readPortal();}
-       if(portal.forms>0)throw Error('等待手动关闭调整单超过 120 秒，本单未提交。');
+       // 关不掉但门户不在保存：直接沿用这张标签继续（不中断整批）
+       stage('残留的调整单标签关不掉，沿用现有标签继续…');
+       reuse=true;
      }
      const resi=await run({type:'confirmResidue'}).catch(()=>[]);
      const left=resi.reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
@@ -583,20 +584,29 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       throw Error(e.message+(now?'；已回读原站，当前状态是「'+now+'」，未到「'+msg.target+'」':'；回读未取到该单状态')+(cleaned?'；已尝试关闭残留确认框 '+cleaned+' 次':'')+(extra?'（'+extra+'）':'')+open+staleNote+'；'+(await pressNote(confirmToken)));
     }
     mark('confirmed');
-    stage('确认已返回，等待原站关闭调整单标签…');
-    if(confirmHit&&confirmHit.submissionComplete){mark('settled');stage('调整单标签已关闭，按已提交处理');return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'tabclosed',verified:false,timing,basis:'调整单标签已自动关闭',staleToast,presses:await pressNote(confirmToken)};}
-    // 确认成功后，门户会在稍后自动关掉调整单标签；等它关掉再进入下一单，
-    // 否则下一单的准备阶段会看到“残留 1 张”，去点它反而把标签卡住。
-    try{
-      const closeEnd=Date.now()+2500;
-      while(Date.now()<closeEnd){
-        const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];
-        if(!st||st.forms===0)break;
-        await pause(120);
+    // v0.9.196：成功口径 = 门户弹出“提交成功” 且 调整单标签自动关闭，两样都出现才算
+    let sawToast=!!(confirmHit&&(confirmHit.via==='toast'||confirmHit.toast));
+    let sawClosed=!!(confirmHit&&confirmHit.submissionComplete);
+    let closedAt=sawClosed?Date.now():0;
+    const sigEnd=Date.now()+30000;
+    stage('等待门户完成：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
+    while(Date.now()<sigEnd&&!(sawToast&&sawClosed)){
+      await pause(200);
+      if(!sawClosed){
+        try{const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(st&&st.forms===0){sawClosed=true;closedAt=Date.now();}}catch{}
       }
-    }catch{}
+      if(!sawToast){
+        try{const t=await run({type:'toastState'});if(t.some(r=>r&&r.toast))sawToast=true;}catch{}
+      }
+      if(sawClosed&&!sawToast&&Date.now()-closedAt>5000)break;
+      const sec=Math.round((Date.now()-cs)/1000);
+      stage('等待门户完成（'+sec+' 秒）：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
+    }
+    if(!(sawToast&&sawClosed)){
+      throw Error('提交后没有同时出现“提交成功”和调整单自动关闭（'+(sawToast?'已看到提交成功':'未看到提交成功')+'、'+(sawClosed?'标签已关闭':'标签仍未关闭')+'）；本次记结果不明，已继续下一单，可稍后到原站核对。');
+    }
     mark('settled');stage('已提交');
-    return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'confirmed',timing,basis:'看到“提交成功”',staleToast,presses:await pressNote(confirmToken)};
+    return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'confirmed',timing,basis:'提交成功+调整单自动关闭',staleToast,presses:await pressNote(confirmToken)};
    }
    if(msg.type==='verify'){
     if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效回查单号');

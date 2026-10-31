@@ -16,7 +16,7 @@ ctx.fakeRun=async c=>{
  if(c.type==='inspect')return [{matched:true}];
  if(c.type==='armSubmission')return [{armed:true}];
  if(c.type==='submit')return [{submitted:true}];
- if(c.type==='confirmSubmit'){confirmCalls++;return confirmCalls<30?[{waiting:true}]:[{confirmed:true}];}
+ if(c.type==='confirmSubmit'){confirmCalls++;return confirmCalls<30?[{waiting:true}]:[{confirmed:true,via:'toast'}];}
  if(c.type==='submissionStatus')return [{forms:1,formActive:true,serviceActive:false,confirmOpen:confirmCalls<30}];
  if(c.type==='submissionComplete')return [{waiting:true}];
  if(c.type==='frameReport')return [{path:'/EIP/nonlogin/mixportal/framework.htm',ready:'complete'}];

@@ -594,6 +594,10 @@ function sourceAction(command){
    const boxes=Array.from(document.querySelectorAll('.mini-messagebox,.mini-window,.mini-panel')).filter(b=>b.getBoundingClientRect().height>0&&/您确定要提交吗/.test(text(b)));
    return {gone:boxes.length===0,count:boxes.length,html:boxes[0]?String(boxes[0].outerHTML||'').replace(/\s+/g,' ').slice(0,400):''};
  }
+ if(command.type==='toastState'){
+   const t=fhToast(/^提交成功$/,true);
+   return {toast:!!t,text:t||''};
+ }
  if(command.type==='confirmDump'){
    const flat=s=>String(s||'').replace(/\s+/g,'');
    const has=/您确定要提交吗/.test(flat(document.body&&document.body.innerText));

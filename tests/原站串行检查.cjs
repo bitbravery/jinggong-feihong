@@ -22,7 +22,7 @@ ctx.fakeRun=async c=>{
  if(c.type==='readForm')return [{dh:formDh,fields:full(formDh),current:'已揽件'}];
  if(c.type==='armSubmission')return [{armed:true}];
  if(c.type==='submit')return [{submitted:true}];
- if(c.type==='confirmSubmit')return [{confirmed:true}];
+ if(c.type==='confirmSubmit')return [{confirmed:true,via:'toast'}];
  return [];
 };
 vm.runInContext('run=fakeRun;',ctx);
