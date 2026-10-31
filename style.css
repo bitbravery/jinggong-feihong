@@ -239,3 +239,16 @@ body.has-selection-bar #toast{bottom:104px}
 .history-notice-body dd{margin:2px 0 0;color:#4a5a54}
 .history-notice-body code{background:#f2ece0;padding:1px 5px;border-radius:4px;font-size:12px}
 .history-notice-body a{color:var(--green)}
+
+/* v0.9.186：重要提示独立成页 */
+.tips-panel{max-width:980px}
+.tips-panel h2{margin:0 0 6px}
+.tips-body{padding:2px 2px 4px;font-size:13px;line-height:1.9;color:var(--ink)}
+.tips-body h3{margin:18px 0 6px;font-size:14px;color:#8a6413}
+.tips-body ol{padding-left:22px;margin:6px 0}
+.tips-body li{margin:5px 0}
+.tips-body dl{margin:6px 0}
+.tips-body dt{font-weight:600;margin-top:10px}
+.tips-body dd{margin:3px 0 0;color:#4a5a54}
+.tips-body code{background:#f2ece0;padding:1px 5px;border-radius:4px;font-size:12px}
+.tips-body a{color:var(--green)}
