@@ -54,4 +54,8 @@ assert(/所选时间段内没有修改记录/.test(live),'空结果要说明');
  assert(/原站现为：已送达/.test(html),'应显示原站现态');
  assert(/data-revert="A"/.test(html)&&/data-status="A"/.test(html),'两个按钮都要在行里');
 }
+// 入队后立即重绘：点了按钮当场就能看到“查询中 k/n / 排队中 m/n”
+assert(/try\{renderHistory\(\);\}catch\{\}/.test(live),'入队后要立即重绘按钮');
+assert(/historyRunning=statusQueue\[0\]/.test(live),'开跑前先把第一条标成查询中');
+
 console.log('通过：历史按日期折叠，操作按钮同一行，查看后显示原站现态。');
