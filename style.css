@@ -220,8 +220,7 @@ body.has-selection-bar #toast{bottom:104px}
 .status-option:has(input:checked){color:var(--green);font-weight:600}
 
 /* v0.9.185：表格字号（可调，作用于快件表与历史表） */
-#parcelTable{font-size:var(--table-fs,14px)}
-.history-table{font-size:var(--table-fs,14px)}
+html{font-size:var(--page-fs,14px)}
 
 /* v0.9.185：状态修改历史 · 重要提示 */
 .history-notice{margin:14px 0 16px;border:1px solid #e6d9b8;background:#fdf8ec;border-radius:10px;padding:0 14px}

@@ -1,8 +1,7 @@
 (()=>{
  const table=document.getElementById('parcelTable'),cols=[...table.querySelectorAll('col')],headers=[...table.querySelectorAll('th')],density=document.getElementById('tableDensity');
- const fontSel=document.getElementById('tableFont'),fontCustom=document.getElementById('tableFontCustom');
- const fontSizeOf=()=>Number(fontSel&&fontSel.value==='custom'?(fontCustom&&fontCustom.value||14):(fontSel&&fontSel.value||14))||14;
- function applyFont(){const px=Math.min(24,Math.max(10,fontSizeOf()));document.documentElement.style.setProperty('--table-fs',px+'px');}
+ const fontSel=document.getElementById('pageFont'),fontCustom=document.getElementById('pageFontCustom');
+ const applyFont=()=>window.FeiHongPageFont.save(window.FeiHongPageFont.readControls(fontSel,fontCustom));
  const freezeInputs=[...document.querySelectorAll('[data-freeze]')],panel=document.getElementById('parcelPanel');
  const freezeKey='feihong-freeze-rows-v1';let frozen={};try{frozen=JSON.parse(localStorage.getItem(freezeKey))||{};}catch{}
  function updateFreeze(){let offset=0;for(const id of ['statusRow','queryRow']){const row=document.getElementById(id),enabled=freezeInputs.find(i=>i.dataset.freeze===id).checked;row.classList.toggle('pinned-row',enabled);row.style.top=enabled?offset+'px':'auto';if(enabled)offset+=row.getBoundingClientRect().height;}
@@ -24,8 +23,8 @@
  });
  density.onchange=()=>{apply();save();};
  fontSel.onchange=()=>{fontCustom.hidden=fontSel.value!=='custom';if(fontSel.value==='custom'){fontCustom.focus();}applyFont();save();};
- fontCustom.oninput=()=>{applyFont();save();};
- applyFont();document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();apply();}}).observe(table.parentElement);apply();
+ fontCustom.oninput=()=>applyFont();
+ try{window.FeiHongPageFont.restore();}catch{}document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();apply();}}).observe(table.parentElement);apply();
 })();
 (()=>{
  // 历史表 6 列：勾选 / 修改时间 / 快件 / 原→新状态 / 处理 / 操作与结果（比例与 index.html 的 colgroup 一致）。

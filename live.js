@@ -44,6 +44,14 @@ function toast(s,duration=6500){
 }
 async function request(msg){if(!globalThis.chrome?.runtime?.id)throw Error('请按安装说明加载扩展，并从原站点击扩展图标打开；不要双击此HTML。');const r=await chrome.runtime.sendMessage(msg);if(!r?.ok)throw Error(r?.error==='不支持的操作'?'后台组件仍是旧版本：请在 Edge 扩展卡片点圆形箭头重新加载，再回学校页点击扩展图标。仅刷新工作台不会更新后台。':r?.error||'扩展连接已中断，请在原站重新点击扩展图标。');return r.data;}
 function kind(){return currentView==='flow'?'flow':'query';}
+// v0.9.190：页面字号——按“标准 14px”为 1.0 缩放整页；本地立即生效，后台 chrome.storage 持久化
+const PageFont={key:'feihong-page-font',min:10,max:26,base:14,
+ readControls(sel,custom){const v=sel&&sel.value==='custom'?Number(custom&&custom.value||this.base):Number(sel&&sel.value||this.base);return Math.min(this.max,Math.max(this.min,Math.round(v)||this.base));},
+ apply(px){const p=Math.min(this.max,Math.max(this.min,Number(px)||this.base));document.documentElement.style.setProperty('--page-fs',p+'px');document.body.style.zoom=String(p/this.base);this.px=p;},
+ save(px){this.apply(px);try{localStorage.setItem(this.key,String(px));}catch{}try{request({type:'pageFont',action:'set',px}).catch(()=>{});}catch{}},
+ applyControls(px){const sel=$('pageFont'),custom=$('pageFontCustom');if(!sel)return;const preset=['12','14','16','18'].includes(String(px));sel.value=preset?String(px):'custom';custom.hidden=preset;if(!preset)custom.value=String(px);this.apply(px);},
+ async restore(){let px=Number(localStorage.getItem(this.key))||0;try{const r=await request({type:'pageFont',action:'get'});if(r&&Number(r.px))px=Number(r.px);}catch{}this.applyControls(px||this.base);}};
+window.FeiHongPageFont=PageFont;
 function orders(){return records[kind()];}
 function filtered(){const selectedDirection=$('direction').value;const column=CampusPerspective.columns(campus).find(c=>c.key===activeColumn)||CampusPerspective.columns(campus)[0];const f={status:'all',direction:'all',identity:$('identity').value,region:$('region').value,search:$('search').value,officeKeywords};return FeiHong.queryRows(orders().filter(o=>matches(o,f,mappings)&&CampusPerspective.includes(o,campus,selectedDirection)&&(currentView==='flow'?o.flow===flowTab&&o.fromCampus===campus:CampusPerspective.matchesColumns(o,campus,activeColumns,mappings))),{day:$('orderDay').value,sort:sortColumn,descending:sortDescending});}
 function setSnapshot(s){
@@ -57,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.189')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.190')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});

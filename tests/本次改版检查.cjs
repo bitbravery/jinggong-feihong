@@ -30,11 +30,15 @@ assert(/dataset\.value\|\|''/.test(live),'提交时要读点选结果');
 assert(/\.status-option:has\(input:checked\)/.test(css),'选中态要有样式');
 
 // 4) 表格字号：密度左侧的新选择 + 自定义 + 持久化
-assert(/id="tableFont"/.test(html)&&/id="tableFontCustom"/.test(html),'要有表格字号与自定义输入');
-assert(html.indexOf('id="tableFont"')<html.indexOf('id="tableDensity"'),'字号选择应在密度左侧');
-assert(/--table-fs/.test(css),'字号要通过 CSS 变量生效');
-assert(/fontSel\.onchange/.test(layout)&&/applyFont/.test(layout),'字号切换要即时生效并保存');
-assert(/font:fontSel\.value/.test(layout),'字号要写进本地保存');
+assert(/id="pageFont"/.test(html)&&/id="pageFontCustom"/.test(html),'要有页面字号与自定义输入');
+assert(html.indexOf('id="pageFont"')<html.indexOf('id="tableDensity"'),'字号选择应在密度左侧');
+assert(!/id="tableFont"/.test(html),'旧的表格字号控件应已移除');
+assert(/--page-fs/.test(css),'页面字号通过 CSS 变量暴露');
+assert(/FeiHongPageFont/.test(read('live.js')),'live.js 要提供页面字号能力');
+assert(/document\.body\.style\.zoom/.test(read('live.js')),'按字号缩放整页（zoom）');
+assert(/msg\.type==='pageFont'/.test(read('worker.js')),'后台要持久化页面字号');
+assert(/chrome\.storage\.local/.test(read('worker.js')),'后台用 chrome.storage.local 保存');
+assert(/fontSel\.onchange/.test(layout)&&/applyFont/.test(layout),'切换后要即时生效并保存');
 
 // 5) 状态修改历史：重要提示（含开发说明与仓库地址）
 assert(/id="tips"/.test(html),'重要提示要独立成一个栏目页');

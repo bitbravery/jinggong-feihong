@@ -2,9 +2,9 @@
 
 ## ⬇ Download / 下载
 
-**最新版本：[v0.9.189](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
+**最新版本：[v0.9.190](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
 
-直接下载安装包 → [`jinggong-feihong-v0.9.189.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v0.9.189/jinggong-feihong-v0.9.189.zip)
+直接下载安装包 → [`jinggong-feihong-v0.9.190.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v0.9.190/jinggong-feihong-v0.9.190.zip)
 SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
 
 > 下载后在 Edge 里「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
@@ -12,7 +12,7 @@ SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
 
 面向北京理工大学良乡 / 中关村两校区快递收发场景的浏览器扩展：在门户（ehall）之上做**查询、分类、批量读取、状态调整、打印申请单**，把原本要在门户里反复点击的操作收敛到一个工作台里。
 
-> 当前版本 **0.9.189**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
+> 当前版本 **0.9.190**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
 
 ## 它解决什么问题
 
@@ -26,13 +26,13 @@ SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
 
 ## 安装（推荐：下载 Release 发布包）
 
-1. 打开本仓库右侧 **Releases**（或直接访问 [v0.9.189](https://github.com/bitbravery/jinggong-feihong/releases/tag/v0.9.189)），下载发布包 `jinggong-feihong-v0.9.189.zip`；
+1. 打开本仓库右侧 **Releases**（或直接访问 [v0.9.190](https://github.com/bitbravery/jinggong-feihong/releases/tag/v0.9.190)），下载发布包 `jinggong-feihong-v0.9.190.zip`；
 2. 解压到**固定目录**，例如 `D:\京工飞鸿\`（升级要保持同一路径）；
    - 确认解压后该目录里**直接**能看到 `manifest.json`；如果多套了一层文件夹，加载时选到里面那一层；
    - 目录里不能有以 `_` 开头的文件，否则 Edge 会拒绝加载。
 3. 地址栏输入 `edge://extensions` → 打开「开发人员模式」→「加载解压缩的扩展」→ 选择该目录；
 4. 打开学校门户 `https://ehall.bit.edu.cn`，打开「京工飞鸿两校快件系统」标签，点工具栏红色飞鸿图标；
-5. 左下角显示 `接入版 v0.9.189 · 提交核验版` 即安装成功；
+5. 左下角显示 `接入版 v0.9.190 · 提交核验版` 即安装成功；
 6. 换电脑：旧机器「楼宇与区域 → 导出设置」，新机器「导入设置」。
 
 > 没有 Releases 时也可以走源码：点 **Code → Download ZIP**，解压后按上面第 3 步加载（需自己确认版本号）。
@@ -82,7 +82,7 @@ docs/                  教程、部署清单、交接与改动说明
 Get-ChildItem tests -Filter *.cjs | ForEach-Object { & node $_.FullName; if ($LASTEXITCODE -ne 0) { "FAIL: $($_.Name)" } }
 ```
 
-必须全部通过（0.9.189 时共 65 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
+必须全部通过（0.9.190 时共 65 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
 
 ## 已知限制
 

@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.189';
+const COMPONENT_VERSION = '0.9.190';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -248,6 +248,18 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  if(sender.url!==chrome.runtime.getURL('index.html'))return;
  withPortal(msg.type,sender.tab?.id,async()=>{
    if(msg.type==='hello')return {version:COMPONENT_VERSION,recentRead:true,readOnly:!WRITES_ENABLED};
+    if(msg.type==='pageFont'){
+     const key='feihongPageFont';
+     if(msg.action==='get'){
+      try{const o=await chrome.storage.local.get(key);const px=Number(o&&o[key]);return {px:Number.isFinite(px)&&px>=10&&px<=26?px:null};}catch{return {px:null};}
+     }
+     if(msg.action==='set'){
+      const px=Math.min(26,Math.max(10,Math.round(Number(msg.px)||14)));
+      try{await chrome.storage.local.set({[key]:px});}catch{}
+      return {px};
+     }
+     return {px:null};
+    }
    if(['prepare','submit'].includes(msg.type)&&!FeiHongWritePolicy.allowed([msg.order]))throw Error('无效单号或重复记录，禁止提交。');
    if(!WRITES_ENABLED&&['prepare','submit'].includes(msg.type))throw Error('当前版本锁定为只读验收，不填写或提交物流调整表单。');
    if(msg.type==='read'){
