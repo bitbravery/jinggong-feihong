@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.192')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.193')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -115,7 +115,7 @@ function render(listOnly=false){
  $('regionTabs').hidden=!['老师','疑似代老师下单'].includes($('identity').value)||campus!=='良乡';$('regionTabs').innerHTML=['all','北校区','东校区','南校区','东南校区','区域待分配'].map(t=>`<button class="button" data-region="${t}">${t==='all'?'全部区域':t}</button>`).join('');
  $('listTitle').textContent=flow?campus+'流程办理 · '+flowTab:CampusPerspective.columns(campus).find(c=>c.key===activeColumn).label;
  }
- const rowMarkup=visible.map((o,idx)=>`<tr><td><input type="checkbox" data-select="${E(o.id)}" ${o.duplicateOrder?'disabled':''} ${selected.has(o.id)?'checked':''} aria-label="选择 ${E(o.id)}"></td><td class="sequence-cell">${E(seqMode==='local'?(idx+1):(o.sourceSequence??o.seq??''))}</td><td><b>${E(o.id)}</b>${o.duplicateOrder?`<small class="duplicate-warning">原站重复单号 ×${o.duplicateCount}${o.duplicateConflict?' · 信息有冲突':''}（禁改）</small>`:''}<small>${E(FeiHong.orderTime(o.time))}<br>${E(o.item)}</small></td><td>${E(o.sender)} ${personBadge(o)}<small>${E(o.personId)}<br>${E(o.phone)}</small></td><td>${E(o.fromCampus)} · ${E(o.building)} ${E(o.room)}<small>↓ ${E(o.toCampus)} · ${E(o.destination)}<br>${E(region(o,mappings))}</small></td><td>${E(o.receiver)}<small>${E(o.receiverPhone)}</small></td><td><span class="status s${statuses.indexOf(o.status)}">${E(o.status)}</span><small>${flow?'流程：'+E(o.workflowState||o.flow):''}</small></td><td><div class="row-actions"><button data-print="${E(o.id)}" data-flow="${E(o.flow||'')}">打印申请单</button><button data-change="${E(o.id)}" ${(o.duplicateOrder||o.flow==='待办')?'disabled title="待办单需先在原站“批量处理→通过”，变成已办后才能改物流状态"':''}>改物流状态</button><button data-detail="${E(o.recordKey)}">详情</button></div></td></tr>`).join('')||emptyRow();
+ const rowMarkup=visible.map((o,idx)=>`<tr class="${selected.has(o.id)?'row-selected':''}"><td class="select-cell"><input type="checkbox" data-select="${E(o.id)}" ${o.duplicateOrder?'disabled':''} ${selected.has(o.id)?'checked':''} aria-label="选择 ${E(o.id)}"></td><td class="sequence-cell">${E(seqMode==='local'?(idx+1):(o.sourceSequence??o.seq??''))}</td><td><b>${E(o.id)}</b>${o.duplicateOrder?`<small class="duplicate-warning">原站重复单号 ×${o.duplicateCount}${o.duplicateConflict?' · 信息有冲突':''}（禁改）</small>`:''}<small>${E(FeiHong.orderTime(o.time))}<br>${E(o.item)}</small></td><td>${E(o.sender)} ${personBadge(o)}<small>${E(o.personId)}<br>${E(o.phone)}</small></td><td>${E(o.fromCampus)} · ${E(o.building)} ${E(o.room)}<small>↓ ${E(o.toCampus)} · ${E(o.destination)}<br>${E(region(o,mappings))}</small></td><td>${E(o.receiver)}<small>${E(o.receiverPhone)}</small></td><td><span class="status s${statuses.indexOf(o.status)}">${E(o.status)}</span><small>${flow?'流程：'+E(o.workflowState||o.flow):''}</small></td><td><div class="row-actions"><button data-print="${E(o.id)}" data-flow="${E(o.flow||'')}">打印申请单</button><button data-change="${E(o.id)}" ${(o.duplicateOrder||o.flow==='待办')?'disabled title="待办单需先在原站“批量处理→通过”，变成已办后才能改物流状态"':''}>改物流状态</button><button data-detail="${E(o.recordKey)}">详情</button></div></td></tr>`).join('')||emptyRow();
  $('rows').innerHTML=rowMarkup.replace(/<td([^>]*)>/g,'<td$1><div class="cell-content">').replace(/<\/td>/g,'</div></td>');
  $('resultCount').textContent=`${snapshots[kind()]?.bulk&&!snapshots[kind()].complete?'未读完 · 仅已读取部分；':''}本页 ${visible.length} 行 · 匹配 ${matching.length} / 已读取 ${orders().length} 行`;$('selectedCount').textContent=selected.size;{const isTodo=currentView==='flow'&&flowTab==='待办';$('batchApprove').hidden=!isTodo;$('batchReject').hidden=!isTodo;$('batchChange').hidden=isTodo;}const showBar=['orders','flow'].includes(currentView)&&selected.size>0;const sb=$('selectionBar');if(sb)sb.hidden=!showBar;if(document.body&&document.body.classList)document.body.classList.toggle('has-selection-bar',showBar);$('batchChange').disabled=!selected.size||busy;$('batchChange').textContent='批量改状态';$('selectAll').disabled=eligible.length===0;$('selectAll').checked=eligible.length>0&&eligible.every(o=>selected.has(o.id));$('selectAll').indeterminate=eligible.some(o=>selected.has(o.id))&&!eligible.every(o=>selected.has(o.id));
  if(!listOnly)document.dispatchEvent(new Event('feihong-layout')); 
@@ -447,6 +447,18 @@ for(const id of ['cancelCampus','closeCampus'])$(id).onclick=()=>{pendingCampus=
 for(const id of ['direction','identity','region'])$(id).addEventListener('change',()=>{localPage=1;selected.clear();render();});
 $('clearFilters').onclick=()=>{for(const id of ['orderDay'])$(id).value='';sortColumn='';sortDescending=false;localPage=1;$('search').value='';for(const id of ['direction','identity','region'])$(id).value='all';render();};
 $('rows').onchange=e=>{if(e.target.dataset.select){e.target.checked?selected.add(e.target.dataset.select):selected.delete(e.target.dataset.select);render();}};
+// v0.9.193：首列整格可勾选（行与行之间的分界线不响应），选中整行加浅绿底
+$('rows').addEventListener('click',e=>{
+ if(e.target.closest('input,label,a,button'))return;
+ const cell=e.target.closest('td.select-cell');
+ if(!cell||!$('rows').contains(cell))return;
+ const tr=cell.closest('tr'),input=cell.querySelector('input[data-select]');
+ if(!tr||!input||input.disabled)return;
+ const r=cell.getBoundingClientRect();
+ if(e.clientY-r.top<2||r.bottom-e.clientY<2)return; // 分界线不触发
+ input.checked=!input.checked;
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+});
 $('selectAll').onchange=e=>{for(const o of filtered().slice((localPage-1)*LOCAL_PAGE_SIZE,localPage*LOCAL_PAGE_SIZE).filter(o=>!o.duplicateOrder)){if(e.target.checked)selected.add(o.id);else selected.delete(o.id);}render();};async function bulkApprove(action){
  const ids=[...selected];
  if(!ids.length)return;

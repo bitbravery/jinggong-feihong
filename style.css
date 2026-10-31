@@ -272,3 +272,12 @@ html{font-size:var(--page-fs,14px)}
 .status-option:has(input:checked){color:#fff;font-weight:600}
 .status-option:has(input:focus-visible){outline:2px solid #2f6fb3;outline-offset:-3px;border-radius:8px}
 @media (max-width:720px){.status-picker-field{flex-wrap:wrap}.status-picker{flex-basis:100%}}
+
+/* v0.9.193：首列整格可勾选、选中整行浅绿底 */
+#parcelTable td.select-cell{cursor:pointer}
+#parcelTable td.select-cell .cell-content{display:flex;align-items:center;justify-content:center;min-height:100%}
+#parcelTable td.select-cell input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer;margin:0}
+#parcelTable tbody tr.row-selected>td{background:#e9f5ee}
+#parcelTable tbody tr.row-selected>td .cell-content{background:transparent}
+#parcelTable tbody tr.row-selected:hover>td{background:#e2f1e9}
+#parcelTable tbody tr.row-selected td:first-child{box-shadow:inset 3px 0 0 var(--green)}
