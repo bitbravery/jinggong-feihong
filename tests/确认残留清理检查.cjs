@@ -30,11 +30,12 @@ function harness(residues){
   assert.equal(h.stats().dismissed,1,'应尝试关闭一次残留弹窗');
   assert(h.stages.some(s=>/清理上一次遗留的确认框/.test(s)),'应有清理阶段提示');
 
-  // 清不掉时：暂停并等人手动关掉（最多 120 秒），关掉后自动继续
-  h=harness([1,1,1,0]);
+  // 点两次还清不掉：明确报错，不再等人工（用户要求不留等待）
+  h=harness([1,1,1]);
   r=await h.call({type:'prepare',order});
-  assert(r.ok,'手动关掉残留后应继续：'+r.error);
-  assert(h.stages.some(s=>/请到原站点「取消」关闭上一单确认框/.test(s)),'暂停时要提示手动关闭');
-  console.log('通过：开单前清理残留确认框；清不掉则暂停等手动关闭，关掉后自动继续。');
+  assert(!r.ok,'清不掉时应报错');
+  assert.match(r.error,/确认框关不掉/,'错误要说明确认框关不掉');
+  assert.equal(h.stats().dismissed,2,'最多点两次确定');
+  console.log('通过：开单前清理残留确认框；两次清不掉直接报错，不等待人工。');
 })().catch(e=>{console.error(e);process.exitCode=1;});
 

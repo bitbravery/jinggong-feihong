@@ -27,10 +27,10 @@ const order={id:'JGKD2026092036825',status:'订单申请'};
 
  forms=1;stuck=true;calls=[];
  r=await call({type:'prepare',order});
- assert(r.ok,'手动关闭后应继续：'+r.error);
+ assert(!r.ok,'关不掉时应直接报错');
+ assert.match(r.error,/关不掉/,'错误要说明关不掉');
  assert.equal(calls.filter(t=>t==='closeFormTab').length,4,'最多尝试四次');
- assert(calls.includes('openForm'),'手动关闭后必须打开新表单');
- assert(stages.some(x=>/已暂停.*手动关闭/.test(x)),'应提示人工关闭并等待');
+ assert(!calls.includes('openForm'),'关不掉时不得打开新表单');
 
  forms=0;stuck=false;service=false;calls=[];
  r=await call({type:'prepare',order});
