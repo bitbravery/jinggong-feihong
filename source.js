@@ -638,17 +638,29 @@ function sourceAction(command){
       if(exp){exp.click();return {expanded:true};}
       return {error:'流程页没有找到“发起日期”，也没有找到“展开查询”按钮。'};
     }
-    let box=label.closest('tr')||label.parentElement;
-    let inputs=Array.from(box.querySelectorAll('input'));
-    if(inputs.length<2){const panel=label.closest('.mini-panel,.query-box,.search-box')||box.parentElement;inputs=Array.from(panel.querySelectorAll('input')).filter(i=>i.offsetParent!==null);}
-    if(inputs.length<2)return {error:'“发起日期”附近没有找到两个日期框。'};
+    const box=label.closest('tr')||label.parentElement;
+    const lr=label.getBoundingClientRect();
+    const usable=i=>{
+      if(String(i.type||'').toLowerCase()==='hidden')return false;
+      if(i.disabled||i.readOnly&&i.tagName==='INPUT'&&i.hidden)return false;
+      try{const r=i.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=lr.left-6;}catch{return false;}
+    };
+    // 优先认 MiniUI 日期控件（发起日期右侧的两个），再退回“标签右侧的可见输入框”
+    let pickers=Array.from(box.querySelectorAll('.mini-datepicker')).filter(el=>{try{const r=el.getBoundingClientRect();return r.width>0&&r.height>0&&r.left>=lr.left-6;}catch{return false;}});
+    let inputs=pickers.map(p=>p.querySelector('input')).filter(Boolean);
+    if(inputs.length<2)inputs=Array.from(box.querySelectorAll('input')).filter(usable).sort((a,b)=>a.getBoundingClientRect().left-b.getBoundingClientRect().left);
+    if(inputs.length<2){const panel=label.closest('.mini-panel,.query-box,.search-box')||(box&&box.parentElement)||box;pickers=Array.from(panel.querySelectorAll('.mini-datepicker')).filter(el=>{try{const r=el.getBoundingClientRect();return r.width>0&&r.height>0;}catch{return false;}});inputs=pickers.map(p=>p.querySelector('input')).filter(Boolean);}
+    if(inputs.length<2)return {error:'“发起日期”右侧没有找到两个日期框（找到 '+inputs.length+' 个可见输入）。'};
+    inputs=inputs.slice(0,2);
     // 按 MiniUI 控件写值（与快件查询页的做法相同），并核对确实写进去了
     const setDate=(el,v)=>{const w=window.mini?.get?.(String(el.id||'').replace(/\$text$/,''));if(w?.setValue){w.setValue(v);}else{try{const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;d.call(el,v);}catch{el.value=v;}try{el.dispatchEvent(new Event('input',{bubbles:true}));}catch{}try{el.dispatchEvent(new Event('change',{bubbles:true}));}catch{}}return String(el.value||'')===String(v);};
     const before=rowIds();
     if(!setDate(inputs[0],command.from)||!setDate(inputs[1],command.to))return {error:'发起日期没有写进原站日期框（当前为“'+String(inputs[0].value||'')+'”至“'+String(inputs[1].value||'')+'”），未查询。'};
     const caption=el=>String(el.tagName==='INPUT'?el.value:text(el)).replace(/\s+/g,'');
     const clickables=Array.from(document.querySelectorAll('button,a,span,input[type="button"],input[type="submit"]')).filter(vis);
-    const btn=clickables.find(el=>/^(查询|搜索)$/.test(caption(el)));
+    const btn=clickables.find(el=>/^(查询|搜索)$/.test(caption(el)))
+      ||clickables.find(el=>{const c=String(el.className||'');return /(^|[\s_-])(query|search)([\s_-]|$)/i.test(c)&&!/重置|收起|展开/.test(caption(el));})
+      ||clickables.find(el=>/查询|搜索/.test(String(el.getAttribute&&el.getAttribute('title')||'')));
     if(btn){btn.click();return {queried:true,via:'button',before};}
     // 没有独立“查询”按钮的版本：改完日期发 change/回车，让门户自己触发查询
     for(const el of inputs){try{el.dispatchEvent(new Event('change',{bubbles:true}));}catch{}}

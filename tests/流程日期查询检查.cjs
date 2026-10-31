@@ -5,7 +5,7 @@ const src=fs.readFileSync(__dirname+'/../source.js','utf8');
 
 function page({frameH=528,button=null,widgetWorks=true,hasLabel=true,expanded=false}={}){
  const st={clicks:0,sets:[],expand:0};
- const vis={getBoundingClientRect:()=>({height:20,width:60})};
+ const vis={getBoundingClientRect:()=>({height:20,width:60,left:0,top:0})};
  const mkInput=id=>({id,value:'',offsetParent:{},...vis,dispatchEvent(){}});
  const inputs=[mkInput('fqrq1$text'),mkInput('fqrq2$text')];
  const row={querySelectorAll:s=>s==='input'?inputs:[],outerHTML:'<tr>发起日期<input></tr>'};
