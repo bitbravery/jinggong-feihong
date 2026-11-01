@@ -34,4 +34,8 @@ const w=fs.readFileSync(__dirname+'/../worker.js','utf8');
 assert(w.includes('async function queryOneRaw'),'queryOne 原逻辑保留');
 assert(/async function queryOne\(id,opts\)\{\s*try\{return await queryOneRaw\(id,opts\);\}\s*finally\{try\{await closeQueryPanel\(\);\}catch\{\}\}\s*\}/.test(w),'查询结束必须关闭查询面板');
 assert(/await ensureFormActive\(stage\);\s*\n\s*try\{await closeQueryPanel\(\);\}catch\{\}/.test(w),'填单号前也先关查询面板');
+// v0.9.217：自定义时段/近一个月批量读取结束后也要自动关闭查询面板（先红✕再「关闭查询」）
+assert(/PORTAL_OPS=new Set\(\['openStandardPages','endRead'/.test(w),'endRead 要进原站串行队列');
+assert(/if\(msg\.type==='endRead'\)\{[\s\S]{0,400}closeQueryPanel\(\)/.test(w),'批量读取结束后必须关闭查询面板');
+assert(/ended:true,closed/.test(w),'endRead 要返回关闭结果');
 console.log('通过：先点条件行红色错号，再点「关闭查询」。');

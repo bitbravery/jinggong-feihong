@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.216';
+const COMPONENT_VERSION = '0.9.217';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -355,7 +355,7 @@ async function waitSaved(stage,check){
 // 原站只有一套标签/表单：所有会驱动原站的操作在这里排队，一次只跑一个。
 // 准备成功到提交之间（准备令牌有效期内）挡住其他工作台的操作，避免改动已核对的表单；
 // 同一工作台自己按 准备→提交 串行，不挡（否则工作台刷新后会被自己的旧令牌卡 2 分钟）。
-const PORTAL_OPS=new Set(['openStandardPages','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
+const PORTAL_OPS=new Set(['openStandardPages','endRead','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
 let portalBusy='';
 const writeHeld=(type,owner)=>!!preparedWrite&&Date.now()-preparedWrite.at<=120000&&type!=='submit'&&preparedWrite.owner!==owner;
 // 持有令牌的工作台已关闭：令牌作废，不再挡别人
@@ -561,7 +561,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     return {...s,flowTab:msg.flowTab,stale:true};
    }
    if(msg.type==='flowNext')return readPage('next','flow',msg.flowTab);
-   if(msg.type==='endRead')return {ended:true};
+   if(msg.type==='endRead'){
+    // v0.9.217：自定义时段/近一个月批量读取结束后，把原站「快件查询」的查询条件面板关掉
+    // 顺序按现场：先点条件行右侧红色错号，再点「关闭查询」（source.js closeQuery）
+    await pause(250);
+    let closed=false;try{closed=await closeQueryPanel();}catch{}
+    if(!closed){await pause(400);try{closed=await closeQueryPanel();}catch{}}
+    return {ended:true,closed};
+   }
    if(msg.type==='beginAll'){
      const stage=text=>chrome.runtime.sendMessage({type:'readStage',readId:msg.readId,text}).catch(()=>{});
      stage('正在打开原站查询并设置每页条数…');
