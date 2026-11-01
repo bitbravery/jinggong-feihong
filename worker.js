@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.214';
+const COMPONENT_VERSION = '0.9.215';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -68,6 +68,108 @@ async function formOrder(id){
  if(!SourceMapping.statuses.includes(last.current))throw Error('原站当前物流状态无法识别：'+(last.current||'空'));
  const F=last.fields;
  return {id,status:last.current,sender:F.JJRXM,personId:F.JJRGH,phone:F.JJRDH,fromCampus:F.JJDZXQ,building:F.JJDZYL,room:F.JJDZFJH,receiver:F.SJRXM,receiverPhone:F.SJRDH,toCampus:F.SJXQDZ,destinationBuilding:F.SJDZYL,destinationRoom:F.SJDZFJH,duplicateOrder:false};
+}
+
+// —— v0.9.215：打开原站标准页面（用户 2026-11-02 要求）——
+// 先把门户里除“工作台”外的标签全部关掉，再从工作台依次打开：【流程】、京工飞鸿两校快件系统、快件查询；
+// 打开快件查询要经过“业务管理中心 → 京工飞鸿两校快件（业务包）→ 快件查询”，这两个中间标签最后关掉。
+const STANDARD_TAB_TESTS=[/工作台/,/^【流程】$/,/^快件查询$/,/^京工飞鸿两校(?:区)?快件系统$/];
+const tabNorm=t=>String((t&&t.text)||'').replace(/\s+/g,'');
+async function portalTabs(){
+ const out=await run({type:'tabs'});
+ const found=out.filter(r=>Array.isArray(r.tabs));
+ if(found.length!==1)throw Error('没有唯一识别到门户标签栏（多半是当前不在门户页面），请回到学校门户再点。');
+ return found[0].tabs;
+}
+async function waitPortalTabs(pred,label,budget=25000){
+ const end=Date.now()+budget;let last=[];
+ while(Date.now()<end){
+  last=await portalTabs();
+  if(pred(last))return last;
+  await pause(250);
+ }
+ throw Error(label+'（等了 '+Math.round(budget/1000)+' 秒；当前标签：'+(last.map(t=>t.text).join('、')||'无')+'）');
+}
+async function clickPortalTab(name){
+ const out=await run({type:'tabClick',text:name});
+ const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
+ return out.find(r=>r.clicked)||{clicked:true};
+}
+function standardStage(text){try{chrome.runtime.sendMessage({type:'standardStage',text}).catch(()=>{});}catch{}}
+async function openStandardPages(){
+ await standardStage('检查门户标签');
+ let portal=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];
+ if(!portal)throw Error('没有读到门户标签栏，请回到学校门户页面，点一次红色飞鸿图标重新连接。');
+ if(!portal.tabs.some(t=>/工作台/.test(t)))throw Error('门户里没有“工作台”标签（当前：'+(portal.tabs.join('、')||'无')+'），请先回到门户首页。');
+ // 第 0 步：有正在保存的调整单时先等它结束，避免关标签把门户卡在“加载中”（用户要求：调整单先等它存完）
+ if(portal.forms>0){
+  await standardStage('原站还有“物流状态调整单”，先等它保存完成');
+  const end=Date.now()+90000;
+  while(Date.now()<end){
+   await pause(1000);
+   portal=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];
+   if(!portal||portal.forms===0)break;
+  }
+  if(portal&&portal.forms>0)throw Error('原站“物流状态调整单”90 秒内没有保存完。为避免门户卡死，已停止；请到原站确认这一单处理完后再点“打开原站标准页面”。');
+ }
+ await standardStage('关闭原站其他标签，只留“工作台”');
+ for(let i=0;i<10;i++){
+  const out=await run({type:'tabCloseAll',keep:'工作台'});
+  const info=out.filter(r=>typeof r.closed==='number')[0];
+  if(!info||!info.closed)break;
+  await pause(300);
+ }
+ let tabs=await portalTabs();
+ const extraAfterClose=tabs.filter(t=>!/工作台/.test(tabNorm(t)));
+ if(extraAfterClose.length)throw Error('原站标签没有清理干净（还剩：'+extraAfterClose.map(t=>t.text).join('、')+'）。请手动关掉这些标签后再点。');
+ await clickPortalTab('工作台');
+ await pause(400);
+ // 1)【流程】：工作台“我的待办”→点“待办”数字
+ await standardStage('从“我的待办”打开【流程】');
+ tabs=await portalTabs();
+ if(!tabs.some(t=>tabNorm(t)==='【流程】')){
+  await waitSource({type:'workbenchOpenFlow'},'clicked','工作台“我的待办”里没找到可点的“待办”数字',undefined,undefined,20000);
+  await waitPortalTabs(ts=>ts.some(t=>tabNorm(t)==='【流程】'),'点了“待办”数字，但【流程】标签没有出现');
+  await clickPortalTab('工作台');
+  await pause(400);
+ }
+ // 2) 京工飞鸿两校快件系统：工作台“我的服务”→点“京工飞鸿两…”
+ await standardStage('从“我的服务”打开京工飞鸿两校快件系统');
+ tabs=await portalTabs();
+ if(!tabs.some(t=>/^京工飞鸿两校(?:区)?快件系统$/.test(tabNorm(t)))){
+  await waitSource({type:'workbenchOpenService'},'clicked','工作台“我的服务”里没找到“京工飞鸿两…”，请确认工作台已加载完',undefined,undefined,20000);
+  await waitPortalTabs(ts=>ts.some(t=>/^京工飞鸿两校(?:区)?快件系统$/.test(tabNorm(t))),'点了“京工飞鸿两…”，但“京工飞鸿两校快件系统”标签没有出现');
+ }
+ // 3) 快件查询：工作台→业务管理中心→京工飞鸿两校快件（业务包）→快件查询
+ tabs=await portalTabs();
+ if(!tabs.some(t=>tabNorm(t)==='快件查询')){
+  await clickPortalTab('工作台');
+  await pause(400);
+  await standardStage('打开业务管理中心');
+  await waitSource({type:'workbenchOpenBusinessCenter'},'clicked','工作台里没找到“业务管理中心”入口',undefined,undefined,20000);
+  await waitPortalTabs(ts=>ts.some(t=>tabNorm(t)==='业务管理中心'),'“业务管理中心”标签没有出现');
+  await clickPortalTab('业务管理中心');
+  await pause(600);
+  await standardStage('在业务管理中心打开“京工飞鸿两校快件”');
+  await waitSource({type:'centerOpenPackage'},'clicked','业务管理中心里没找到“京工飞鸿两校快件”业务包',undefined,undefined,20000);
+  await waitPortalTabs(ts=>ts.some(t=>tabNorm(t)==='京工飞鸿两校快件'),'“京工飞鸿两校快件”标签没有出现');
+  await clickPortalTab('京工飞鸿两校快件');
+  await pause(600);
+  await standardStage('在业务包页面打开“快件查询”');
+  await waitSource({type:'packageOpenQuery'},'clicked','业务包页面里没找到“快件查询”入口',undefined,undefined,20000);
+  await waitPortalTabs(ts=>ts.some(t=>tabNorm(t)==='快件查询'),'“快件查询”标签没有出现');
+ }
+ // 4) 过河拆桥：快件查询已打开，关掉业务管理中心和业务包页
+ await standardStage('关闭业务管理中心、京工飞鸿两校快件两个临时标签');
+ for(const name of ['业务管理中心','京工飞鸿两校快件']){try{await run({type:'tabClose',text:name});}catch{}await pause(300);}
+ // 5) 核对：只允许“工作台 + 三个标准页面”
+ tabs=await portalTabs();
+ const missing=STANDARD_TAB_TESTS.filter(re=>!tabs.some(t=>re.test(tabNorm(t))));
+ if(missing.length)throw Error('标准页面没有全部打开（缺少 '+missing.map(re=>re.source.replace(/[\^$]/g,'')).join('、')+'；当前：'+tabs.map(t=>t.text).join('、')+'）。');
+ const extra=tabs.filter(t=>!STANDARD_TAB_TESTS.some(re=>re.test(tabNorm(t))));
+ if(extra.length)throw Error('原站还留着计划外标签：'+extra.map(t=>t.text).join('、')+'。请手动关掉后再点，或把这几个标签名告诉我。');
+ try{await clickPortalTab('快件查询');}catch{}
+ return {tabs:tabs.map(t=>t.text),note:'已清理原站其他标签，只打开：工作台、【流程】、快件查询、京工飞鸿两校快件系统。'};
 }
 
 async function framePaths(){try{const out=await run({type:'frameReport'});return out.filter(r=>r&&r.path).map(r=>r.path);}catch{return [];}}
@@ -211,7 +313,7 @@ async function waitSaved(stage,check){
 // 原站只有一套标签/表单：所有会驱动原站的操作在这里排队，一次只跑一个。
 // 准备成功到提交之间（准备令牌有效期内）挡住其他工作台的操作，避免改动已核对的表单；
 // 同一工作台自己按 准备→提交 串行，不挡（否则工作台刷新后会被自己的旧令牌卡 2 分钟）。
-const PORTAL_OPS=new Set(['syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
+const PORTAL_OPS=new Set(['openStandardPages','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
 let portalBusy='';
 const writeHeld=(type,owner)=>!!preparedWrite&&Date.now()-preparedWrite.at<=120000&&type!=='submit'&&preparedWrite.owner!==owner;
 // 持有令牌的工作台已关闭：令牌作废，不再挡别人
@@ -784,6 +886,7 @@ if(msg.type==='diagnose'){
     let flowProbe=[];try{flowProbe=(await run({type:'flowProbe'})).filter(r=>r&&r.flowProbe).map(r=>({...r,name:pageName(r.path)}));}catch{}
     return {flowProbe,flowTrace:flowTrace.slice(),rowDump,flowDebug,preflight,lastFlowSwitch,version:COMPONENT_VERSION,writes:WRITES_ENABLED,prepared:!!preparedWrite,portal:portal?{tabs:portal.tabs,forms:portal.forms,formActive:portal.formActive,service:portal.service,frames:portal.frames}:null,frames};
    }
+   if(msg.type==='openStandardPages')return openStandardPages();
    if(msg.type==='openFlow'){const {sourceTabId}=await chrome.storage.session.get('sourceTabId');await navigate('flow');await chrome.tabs.update(sourceTabId,{active:true});return {opened:true};}
    throw Error('不支持的操作');
  }).then(async data=>{if(['verify'].includes(msg.type)&&sender.tab?.id)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:true,data});}).catch(async e=>{if(['prepare','submit','verify','beginAll'].includes(msg.type)&&sender.tab?.id)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:false,error:e.message});});return true;

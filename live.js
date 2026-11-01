@@ -13,7 +13,7 @@ function setStage(t){stageText=t;renderStage();}
 function tagText(){return batchTotal>1?(batchIndex+'/'+batchTotal+' '):'';}
 function setOrderState(id,text,kind){try{const el=document.querySelector('.cs-state[data-state="'+CSS.escape(String(id))+'"]');if(!el)return;el.textContent=text;el.dataset.kind=kind||'';}catch{}}
 function setOrderNote(id,note){try{const row=document.querySelector('.cs-row[data-row="'+CSS.escape(String(id))+'"]');if(row&&note)row.title=note;}catch{}}
-if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
+if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
 let readProgress={rows:0,total:null,page:0,pages:null,percent:null,started:0,note:''};
 function drawReadProgress(){const p=readProgress,seconds=p.started?((performance.now()-p.started)/1000).toFixed(1):'0.0';$('bulkText').textContent=`已查询 ${p.rows}/${p.total??'—'} 行，第 ${p.page}/${p.pages??'—'} 页，用时 ${seconds} 秒，进度 ${p.percent===null?'待计算':p.percent+'%'}${p.note?' · '+p.note:''}`;}
 let localPage=1, pendingCampus=null, bulkCancelled=false;
@@ -24,7 +24,7 @@ let officeKeywords=defaultOfficeKeywords;try{const v=JSON.parse(localStorage.get
 function personBadge(o){const info=senderInfo(o,officeKeywords);return `<span class="person-tag person-${info.kind}">${info.kind==='student'?'●':info.kind==='teacher'?'◆':info.kind==='service'?'✉':'?'} ${E(info.label)}</span>${info.proxy?'<small class="proxy-tag">↗ 疑似代老师下单 · 地址推断，待核实</small>':''}`;}
 let sortColumn='',sortDescending=false;
 let campus='良乡',activeColumn='all',activeColumns=new Set(['all']);
-let currentView='orders',flowTab='待办',selected=new Set(),snapshots={query:null,flow:null},records={query:[],flow:[]},mappings=Object.create(null),audit=[],pending=[],busy=false,prepared=false,writePhase='idle';
+let currentView='orders',flowTab='待办',selected=new Set(),snapshots={query:null,flow:null},records={query:[],flow:[]},mappings=Object.create(null),audit=[],pending=[],busy=false,standardBusy=false,prepared=false,writePhase='idle';
 let lastReadError='';
 const key='feihong-connector-settings-v1',mKey='feihong-mappings-v1';
 try{const m=JSON.parse(localStorage.getItem(mKey)||'null');if(m&&typeof m==='object')for(const [k,v]of Object.entries(m))if(['北校区','东校区','南校区','东南校区'].includes(v))mappings[k]=v;}catch{}
@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.214')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.215')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -89,7 +89,6 @@ function render(listOnly=false){
  document.querySelectorAll('[data-campus]').forEach(b=>{b.classList.toggle('primary',b.dataset.campus===campus);b.setAttribute('aria-pressed',String(b.dataset.campus===campus));});
  $('direction').innerHTML='<option value="all">全部方向</option><option value="out">'+campus+'→'+(campus==='良乡'?'中关村':'良乡')+'</option><option value="in">'+(campus==='良乡'?'中关村':'良乡')+'→'+campus+'</option>';
  $('direction').value=currentDirection;
- $('campusHint').textContent='当前：'+campus+' · 点击另一校区后确认';
  $('clearFilters').classList.toggle('filters-active',!!($('search').value||$('orderDay').value||$('direction').value!=='all'||$('identity').value!=='all'||$('region').value!=='all'||sortColumn));
  $('region').hidden=campus!=='良乡';
  $('flowTools').hidden=!flow;$('overview').hidden=flow;$('listTitle').hidden=!flow;$('exportExcel').hidden=flow;
@@ -467,6 +466,27 @@ $('overview').onclick=e=>{const b=e.target.closest('[data-column]');if(b){active
 $('campusSwitch').onclick=e=>{const b=e.target.closest('[data-campus]');if(!b||busy||b.dataset.campus===campus)return;pendingCampus=b.dataset.campus;$('campusConfirmText').textContent='从'+campus+'窗口切换至'+pendingCampus+'窗口？';$('campusDialog').showModal();};
 $('confirmCampus').onclick=()=>{if(!pendingCampus||busy)return;campus=pendingCampus;pendingCampus=null;localPage=1;activeColumn='all';activeColumns=new Set(['all']);selected.clear();$('direction').value='all';$('region').value='all';save();$('campusDialog').close();render();};
 for(const id of ['cancelCampus','closeCampus'])$(id).onclick=()=>{pendingCampus=null;$('campusDialog').close();};
+// v0.9.215：一键把原站收拾成标准页面（关掉其他标签 → 只打开【流程】/快件查询/京工飞鸿两校快件系统）
+async function openStandardPages(){
+ if(busy||standardBusy)return;
+ standardBusy=true;const btn=$('openStandard'),label=btn?btn.textContent:'打开原站标准页面';if(btn){btn.disabled=true;btn.textContent='正在打开…';}
+ $('bulkProgress').hidden=false;$('bulkBar').removeAttribute('value');$('bulkText').textContent='正在打开原站标准页面…';$('bulkCount').textContent='正在检查原站标签';lastReadError='';
+ try{
+  await requireComponent();
+  const r=await request({type:'openStandardPages'});
+  $('bulkText').textContent=r.note||('原站标准页面已就绪：'+((r.tabs||[]).join('、')));
+  $('bulkCount').textContent='原站标准页面已就绪';
+  toast('原站标准页面已打开：'+((r.tabs||[]).join('、')),8000);
+ }catch(e){
+  $('bulkText').textContent='打开原站标准页面失败：'+e.message;$('bulkCount').textContent='打开原站标准页面失败';
+  toast('打开原站标准页面失败：'+e.message,12000);
+ }finally{
+  standardBusy=false;if(btn){btn.disabled=false;btn.textContent=label;}
+  $('bulkBar').max=100;$('bulkBar').value=100;
+  setTimeout(()=>{if(!busy)$('bulkProgress').hidden=true;},6000);
+ }
+}
+$('openStandard').onclick=()=>{openStandardPages();};
 for(const id of ['direction','identity','region'])$(id).addEventListener('change',()=>{localPage=1;selected.clear();render();});
 $('clearFilters').onclick=()=>{for(const id of ['orderDay'])$(id).value='';sortColumn='';sortDescending=false;localPage=1;$('search').value='';for(const id of ['direction','identity','region'])$(id).value='all';render();};
 $('rows').onchange=e=>{if(e.target.dataset.select){e.target.checked?selected.add(e.target.dataset.select):selected.delete(e.target.dataset.select);render();}};

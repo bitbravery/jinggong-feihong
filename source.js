@@ -461,6 +461,135 @@ function sourceAction(command){
    try{if(fhTop.__fhPressed)delete fhTop.__fhPressed;}catch{}
    return {toastMarked:true,visible:n};
   }
+  // —— v0.9.215：打开原站标准页面用的原站动作（只在用户点“打开原站标准页面”时调用）——
+  const fhTabs=()=>Array.from(document.querySelectorAll('.mini-tab')).map(t=>{
+   const close=t.querySelector&&t.querySelector('.mini-tab-close,[class*="tab-close"],a[title="关闭"]');
+   return {text:text(t),active:t.classList.contains('mini-tab-active'),closable:!!close};
+  });
+  const fhNorm=s=>String(s||'').replace(/\s+/g,'');
+  const fhSoftClick=el=>{if(!el)return false;try{el.scrollIntoView&&el.scrollIntoView({block:'center'});}catch{}for(const type of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,button:0,buttons:type==='mousedown'?1:0}));}catch{try{el.click();}catch{}}}return true;};
+  const fhInner=els=>els.filter(el=>!els.some(o=>o!==el&&el.contains(o)));
+  if(command.type==='tabs'){
+   if(window!==top)return null;
+   return {tabs:fhTabs()};
+  }
+  if(command.type==='tabClick'){
+   if(window!==top)return null;
+   const want=fhNorm(command.text),tabs=Array.from(document.querySelectorAll('.mini-tab'));
+   const tab=tabs.find(t=>fhNorm(text(t))===want)||tabs.find(t=>fhNorm(text(t)).includes(want));
+   if(!tab)return {error:'原站没有“'+command.text+'”标签（当前：'+(fhTabs().map(t=>t.text).join('、')||'无')+'）。'};
+   if(!tab.classList.contains('mini-tab-active'))tab.click();
+   return {clicked:true,text:text(tab)};
+  }
+  if(command.type==='tabClose'){
+   if(window!==top)return null;
+   const want=fhNorm(command.text),tab=Array.from(document.querySelectorAll('.mini-tab')).find(t=>fhNorm(text(t))===want);
+   if(!tab)return {closed:0,missing:true};
+   const close=tab.querySelector('.mini-tab-close,[class*="tab-close"],a[title="关闭"]');
+   if(!close)return {error:'门户“'+command.text+'”标签没有可点的关闭按钮，请手动关闭它。'};
+   close.click();return {closed:1};
+  }
+  if(command.type==='tabCloseAll'){
+   if(window!==top)return null;
+   const keep=fhNorm(command.keep);
+   let closed=0;
+   for(const tab of Array.from(document.querySelectorAll('.mini-tab'))){
+    if(fhNorm(text(tab)).includes(keep))continue;
+    const close=tab.querySelector('.mini-tab-close,[class*="tab-close"],a[title="关闭"]');
+    if(!close)continue;
+    close.click();closed++;
+    if(closed>=6)break;
+   }
+   return {closed,remaining:fhTabs().map(t=>t.text)};
+  }
+  // 工作台：点“我的待办”里“寄件申请信息单”那一行的“待办”数字，门户会打开【流程】
+  if(command.type==='workbenchOpenFlow'){
+   if(window===top)return null;
+   const page=text(document.body);
+   if(!page.includes('我的待办'))return null;
+   const rows=Array.from(document.querySelectorAll('div,li,tr,section')).filter(el=>{
+    if(!fhVis(el))return false;
+    const t=text(el);
+    return t.includes('寄件申请信息单')&&t.includes('待办')&&t.length<=160;
+   });
+   if(!rows.length)return {error:'工作台有“我的待办”，但没有找到“寄件申请信息单”那一行（页面可能还没加载完）。'};
+   const row=rows.reduce((a,b)=>(a.contains&&a.contains(b))?b:a);
+   const label=Array.from(row.querySelectorAll('*')).find(el=>text(el)==='待办'&&fhVis(el));
+   if(!label)return {error:'“寄件申请信息单”这一行里没有“待办”字样。'};
+   let scope=label.parentElement,box=null;
+   for(let i=0;i<4&&scope;i++){
+    const nums=Array.from(scope.querySelectorAll('*')).filter(el=>el!==scope&&/^\d{1,4}$/.test(text(el))&&fhVis(el));
+    if(nums.length){box=nums[0];break;}
+    scope=scope.parentElement;
+   }
+   const target=box?((box.closest&&box.closest('a'))||box):label;
+   fhSoftClick(target);
+   return {clicked:true,sample:text(row).replace(/\s+/g,' ').slice(0,100)};
+  }
+  // 工作台“我的服务”：点“京工飞鸿两…”卡片，打开京工飞鸿两校快件系统
+  if(command.type==='workbenchOpenService'){
+   if(window===top)return null;
+   const page=text(document.body);
+   if(!page.includes('我的服务'))return null;
+   const cands=Array.from(document.querySelectorAll('a,button,div,li,span')).filter(el=>{
+    if(!fhVis(el))return false;
+    const t=text(el);
+    return /京工飞鸿/.test(t)&&t.length<=40;
+   });
+   if(!cands.length)return {error:'工作台“我的服务”里没有找到“京工飞鸿两…”（请确认工作台已加载完）。'};
+   const withKj=cands.filter(el=>/京工飞鸿两.{0,6}快件/.test(text(el)));
+   const el=fhInner(withKj.length?withKj:cands)[0]||cands[0];
+   const target=(el.closest&&el.closest('a,[onclick]'))||el;
+   fhSoftClick(target);
+   return {clicked:true,sample:text(el).slice(0,60)};
+  }
+  // 工作台页面下滑：点“业务管理中心 »”
+  if(command.type==='workbenchOpenBusinessCenter'){
+   if(window===top)return null;
+   const page=text(document.body);
+   if(!page.includes('业务管理中心')||!page.includes('我的服务'))return null;
+   const cands=Array.from(document.querySelectorAll('a,button,div,span,li')).filter(el=>{
+    if(!fhVis(el))return false;
+    const t=fhNorm(text(el));
+    return t.includes('业务管理中心')&&t.length<=24;
+   });
+   if(!cands.length)return {error:'工作台页面里没有找到“业务管理中心”入口（请确认工作台已加载完）。'};
+   const pick=cands.find(el=>/»|》|>/.test(text(el)))||cands.find(el=>el.tagName==='A')||cands[cands.length-1];
+   const target=(pick.closest&&pick.closest('a,[onclick]'))||pick;
+   fhSoftClick(target);
+   return {clicked:true,sample:text(pick).slice(0,40)};
+  }
+  // 业务管理中心：点“京工飞鸿两校快件”业务包卡片
+  if(command.type==='centerOpenPackage'){
+   if(window===top)return null;
+   const page=text(document.body);
+   if(!page.includes('业务包名称'))return null;
+   const cands=Array.from(document.querySelectorAll('a,div,li,section,article,span')).filter(el=>{
+    if(!fhVis(el))return false;
+    const t=fhNorm(text(el));
+    return t.includes('京工飞鸿两校快件')&&t.length<=120;
+   });
+   if(!cands.length)return {error:'业务管理中心里没有找到“京工飞鸿两校快件”业务包（请确认页面已加载完）。'};
+   const el=fhInner(cands)[0]||cands[0];
+   const target=(el.closest&&el.closest('a,[onclick]'))||el;
+   fhSoftClick(target);
+   return {clicked:true,sample:text(el).replace(/\s+/g,' ').slice(0,80)};
+  }
+  // 业务包页面：点“快件查询”卡片，打开快件查询标签
+  if(command.type==='packageOpenQuery'){
+   if(window===top)return null;
+   const page=text(document.body);
+   if(!page.includes('大厅服务')||!page.includes('快件查询'))return null;
+   const cands=Array.from(document.querySelectorAll('a,button,div,li,span')).filter(el=>{
+    if(!fhVis(el))return false;
+    return fhNorm(text(el))==='快件查询';
+   });
+   if(!cands.length)return {error:'业务包页面里没有找到“快件查询”入口（请确认页面已加载完）。'};
+   const el=fhInner(cands)[0]||cands[0];
+   const target=(el.closest&&el.closest('a,[onclick]'))||el;
+   fhSoftClick(target);
+   return {clicked:true};
+  }
   if(command.type==='pressInfo'){
    if(window!==top)return null;
    const L=window.__fhPressLog;if(!L||L.token!==command.token)return {pressInfo:true,count:0};

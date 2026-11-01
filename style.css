@@ -347,3 +347,8 @@ main{max-width:none}
 #queryRow>select{flex:1 1 110px;min-width:92px;max-width:150px}
 #queryRow .search{flex:2 1 160px;min-width:110px}
 #queryRow input[type=date]{flex:0 1 116px;min-width:104px}
+
+/* v0.9.215：打开原站标准页面（放在校区按钮下方整行；图标模式下随 .sidebar-campus 一起隐藏） */
+#openStandard{display:block;width:100%;margin-top:10px;padding:9px 8px;font-size:12px;line-height:1.35;background:transparent;border:1px solid #67887b;color:#e6f1b7;border-radius:6px;text-align:center;white-space:normal}
+#openStandard:hover:not(:disabled){background:#1d5446;border-color:#8fb8a6}
+#openStandard:disabled{opacity:.6;cursor:default}
