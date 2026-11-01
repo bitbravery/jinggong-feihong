@@ -613,6 +613,16 @@ function sourceAction(command){
    const boxes=Array.from(document.querySelectorAll('.mini-messagebox,.mini-window,.mini-panel')).filter(b=>b.getBoundingClientRect().height>0&&/您确定要提交吗/.test(text(b)));
    return {gone:boxes.length===0,count:boxes.length,html:boxes[0]?String(boxes[0].outerHTML||'').replace(/\s+/g,' ').slice(0,400):''};
  }
+ if(command.type==='closeQuery'){
+   const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
+   const cands=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14);
+   // 取最里层（宽度最小）的那个，避免点到外层容器
+   cands.sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width);
+   const el=cands[0];
+   if(!el)return {none:true};
+   for(const t of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));}catch{try{el.click();}catch{}}}
+   return {closed:true,label:text(el).slice(0,20)};
+ }
  if(command.type==='toastState'){
    const t=fhToast(/^提交成功$/,true);
    return {toast:!!t,text:t||''};

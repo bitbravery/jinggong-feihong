@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.207';
+const COMPONENT_VERSION = '0.9.208';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -248,12 +248,20 @@ async function clearQueryTags(){
  }
  throw Error('门户快捷标签未能全部清除，按单号回查会被旧条件干扰，已停止。');
 }
-async function queryOne(id,{allowEmpty=false}={}){
+async function queryOneRaw(id,{allowEmpty=false}={}){
  await navigate('query');
  await clearQueryTags();
  await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成');
  const {token}=await waitSource({type:'queryOrder',id},'queryRequested','原站未能发起单号查询');
  const end=Date.now()+60000;while(Date.now()<end){const out=await run({type:'snapshot',kind:'query'});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);if(results.length>1)throw Error('原站存在多个查询页面');if(results.length===1){const s=results[0];if(s.total===0&&allowEmpty)return s;if(s.total!==1||s.rows.length!==1)throw Error('原站按单号查询命中 '+(s.total??'未知')+' 条，不是唯一一条，停止操作。'+(s.scope&&s.scope!=='沿用原站当前查询条件；当前页'?'；门户当前查询条件：'+s.scope:''));const orders=SourceMapping.normalize(s);if(orders[0].id!==id||orders[0].duplicateOrder)throw Error('回查单号不匹配或重复');return s;}await pause(250);}throw Error('原站按单号查询未完成，请人工核验。');
+}
+async function closeQueryPanel(){
+ try{const out=await run({type:'closeQuery'});if(out.some(r=>r&&r.closed)){await pause(150);return true;}return false;}catch{return false;}
+}
+// 门户的条件查询会一直停在“查询条件”面板，查完必须点「关闭查询」回到列表（用户要求：任何查询完成都要关）
+async function queryOne(id,opts){
+ try{return await queryOneRaw(id,opts);}
+ finally{try{await closeQueryPanel();}catch{}}
 }
 chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  if(sender.url!==chrome.runtime.getURL('index.html'))return;
@@ -527,6 +535,7 @@ mark('portal');
      catch(e){const inv=await inventory();throw Error(e.message+(inv?'；原站页面：'+inv:''));}
      mark('form');
      await ensureFormActive(stage);
+     try{await closeQueryPanel();}catch{}
      stage('等待识别调整单输入框（最多 10 秒，尚未填写单号）…');
      try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000);}
      catch(e){const inv=await inventory();let tabs='';try{const p2=await readPortal();tabs='；调整单标签 '+(p2.forms??'?')+' 张'+(p2.formActive?'（活动）':'');}catch{}throw Error(e.message+(inv?'；原站页面：'+inv:'')+tabs+(/未加载完成/.test(e.message)?'。若“物流状态调整单”标签已经消失，说明原站打开后又关闭了该表单，请看门户页面的提示。':''));}
