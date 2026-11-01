@@ -5,7 +5,8 @@ const w=fs.readFileSync(__dirname+'/../worker.js','utf8');
 const css=fs.readFileSync(__dirname+'/../style.css','utf8');
 
 // 1) 地址格：校区进第一行括号，第二行只留收件地址
-assert(live.includes("const r=region(o,mappings);return r&&r!=='—'?'（'+E(r)+'）':''"),'寄件地址第一行要有（校区）');
+assert(live.includes('region-tag'),'校区要渲染成标签');
+assert(!live.includes("r!=='—'?'（'+E(r)+'）'"),'不要再写成括号文本');
 assert(!live.includes("${E(region(o,mappings))}</small></td>"),'校区不应再占第三行');
 
 // 2) 主区与查询条件行自适应

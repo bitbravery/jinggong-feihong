@@ -318,3 +318,7 @@ main{max-width:none}
 #queryRow #direction,#queryRow #identity,#queryRow #region{width:auto!important}
 #queryRow input[type=date]{width:116px;min-width:116px}
 #queryRow .button{padding:6px 10px;font-size:12px;white-space:nowrap}
+
+/* v0.9.210：寄件地址后的校区改成标签，和学生/老师标签一致 */
+.region-tag{background:#e8f2ec;color:#2f6b55}
+.region-tag.pending{background:#fff2d5;color:#896015}
