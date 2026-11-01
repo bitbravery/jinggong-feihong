@@ -18,4 +18,5 @@ for(const v of ['flow','orders','settings','history','tips']){
 }
 assert(/\[data-view=tips\]:before\{content:'⚠'\}/.test(css),'「重要提示」折叠图标应为 ⚠');
 
+assert(live.includes("$('flowPagesWrap').hidden=v!=='flow'"),'“读取前 N 页”只应在流程页显示');
 console.log('通过：读取日期段入口已隐藏；折叠模式下「重要提示」图标已补齐。');
