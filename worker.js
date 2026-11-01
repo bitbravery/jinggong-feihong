@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.198';
+const COMPONENT_VERSION = '0.9.199';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -591,17 +591,12 @@ mark('portal');
         throw Error(e.message);
       }
       stage('确认未返回，先清理残留确认框…');
-      let cleaned=0;
-      try{const d=await run({type:'confirmDismiss'});cleaned=d.reduce((m,r)=>m+((r&&r.dismissed)||0),0);}catch{}
+      try{await run({type:'confirmDismiss'});}catch{}
       await pause(150);
-      stage('正在按单号回读原站…');
-      let rb=null,now='';
-      try{rb=await queryOne(msg.order.id,{allowEmpty:true});}catch{}
-      if(rb&&rb.total===1){try{now=SourceMapping.normalize(rb)[0].status||'';}catch{}}
-      if(now&&now===msg.target){mark('settled');stage('回读确认：原站已是「'+now+'」');return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'readback',verified:true,status:now,timing,basis:'按单号回查原站已是「'+now+'」',staleToast,presses:await pressNote(confirmToken)};}
-      let extra='';try{const d=await run({type:'confirmDump'});extra=d.filter(r=>r&&r.confirmDump&&(r.has||r.boxes)).map(r=>r.path+':文本'+(r.has?'有':'无')+' 弹窗'+r.boxes+' 按钮['+r.btns.join('/')+']'+(r.diag?'｜'+r.diag:'')+(r.masks&&r.masks.length?'｜遮罩['+r.masks.join('/')+']':'')+(r.handler?'｜处理函数 '+r.handler:'')+(r.miniType?'｜组件 '+r.miniType:'')+(r.btnHtml?'｜'+r.btnHtml:'')).join('；');}catch{}
+      let extra='';try{const d=await run({type:'confirmDump'});extra=d.filter(r=>r&&r.confirmDump&&(r.has||r.boxes)).map(r=>r.path+':文本'+(r.has?'有':'无')+' 弹窗'+r.boxes+' 按钮['+(r.btns||[]).join('/')+']').join('；');}catch{}
       let open='';try{const g=await run({type:'confirmGone'});const o=g.find(r=>r&&r.html);if(o&&o.html)open='（弹窗仍在 '+o.html+'）';}catch{}
-      throw Error(e.message+(now?'；已回读原站，当前状态是「'+now+'」，未到「'+msg.target+'」':'；回读未取到该单状态')+(cleaned?'；已尝试关闭残留确认框 '+cleaned+' 次':'')+(extra?'（'+extra+'）':'')+open+staleNote+'；'+(await pressNote(confirmToken)));
+      // v0.9.199：不再跳回“快件查询”按单号回读（既慢又抢门户标签）；记结果不明，由下一单继续
+      throw Error(e.message+(extra?'（'+extra+'）':'')+open+staleNote+'；本次不跳回“快件查询”回读，请稍后在历史里看结果或手动核对。');
     }
     mark('confirmed');
     // v0.9.196：成功口径 = 门户弹出“提交成功” 且 调整单标签自动关闭，两样都出现才算

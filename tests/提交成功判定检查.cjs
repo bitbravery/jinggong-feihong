@@ -77,11 +77,12 @@ function worker(scn){
  w=await worker({stale:1});
  assert(!w.res.ok,'没有任何成功信号时不得报已改好');
  assert.match(w.res.error,/已点「确定」、确认框已关闭，但没有看到“提交成功”/);
- assert.match(w.res.error,/已回读原站，当前状态是「订单申请」，未到「已送达」/);
  assert.match(w.res.error,/提交前页面上已有 1 处“提交成功”字样（已忽略）/);
- // 两个信号都没有，但回查已是目标：按回查记成功，写明依据
+ assert.match(w.res.error,/不跳回“快件查询”回读/,'失败时不再跳回快件查询');
+ assert(!w.log.includes('queryField'),'失败时不得去快件查询回读（抢门户标签、拖慢整批）');
+ // 即使原站已是目标状态，也不再靠回读判成功
  w=await worker({after:'已送达'});
- assert(w.res.ok,w.res.error);assert.match(w.res.data.basis,/按单号回查原站已是「已送达」/);
+ assert(!w.res.ok,'不再用回读结果判成功');
 
  // ---------- v0.9.178：原站点确定后“加载中”保存较久（现场：整页蒙灰两个“加载中…”）----------
  // 保存 40 秒才出“提交成功”：一直等；期间不回查、不重试、不关标签
