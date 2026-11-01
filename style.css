@@ -322,3 +322,7 @@ main{max-width:none}
 /* v0.9.210：寄件地址后的校区改成标签，和学生/老师标签一致 */
 .region-tag{background:#e8f2ec;color:#2f6b55}
 .region-tag.pending{background:#fff2d5;color:#896015}
+
+/* v0.9.211：已办页“实际状态回查”按钮 */
+#flowTools .flow-sync{margin:10px 0 2px}
+#flowTools .flow-sync[hidden]{display:none}

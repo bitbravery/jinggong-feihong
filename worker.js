@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.210';
+const COMPONENT_VERSION = '0.9.211';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -457,7 +457,12 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const first=await readPage('first');return {...first,dateRange:range,scope:'下单时间 '+range.from+' 至 '+range.to+'，所有物流状态'};
    }
     if(msg.type==='syncFlowStatus'){
-     const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
+          // 回查前先关掉“物流状态调整单”等没用的页面，避免影响查询
+     {const out=await run({type:'portalState'});const portal=out.filter(r=>Array.isArray(r.tabs))[0];
+      if(!portal||!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签，无法回查。');
+      for(let i=0;i<3&&portal.forms>0;i++){try{await run({type:'closeFormTab'});}catch{}await pause(120);const p2=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(p2)portal=p2;}
+     }
+const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
      const statuses={};
      for(let i=0;i<ids.length;i++){
       const id=ids[i];
@@ -742,8 +747,12 @@ mark('portal');
    }
    if(msg.type==='statusOf'){
      if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效单号');
-     const order=await formOrder(msg.id);
-     return {id:order.id,status:order.status,order};
+          // v0.9.211：改走「快件查询」按单号查，比打开调整单逐单核对快得多（查询结束会自动点红色错号+关闭查询）
+     const s=await queryOne(msg.id,{allowEmpty:true});
+     if(!s||s.total!==1)throw Error('原站「快件查询」里没有这个单号');
+     const st=(SourceMapping.normalize(s)[0]||{}).status||'';
+     if(!st)throw Error('原站没有返回该单的物流状态');
+     return {id:msg.id,status:st};
     }
    if(msg.type==='diagnose'){
     const portalOut=await run({type:'portalState'});

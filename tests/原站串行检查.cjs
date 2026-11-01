@@ -10,7 +10,7 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js',
 const A='JGKD2026092036825',B='JGKD2026092036826';
 let gate=null;
 const full=id=>({DH:id,JJRGH:'1',JJRXM:'张三',JJRDH:'1',JJDZXQ:'良乡',JJDZYL:'1号楼',JJDZFJH:'101',SJRXM:'李四',SJRDH:'2',SJXQDZ:'中关村',SJDZYL:'2号楼',SJDZFJH:'202'});
-let formDh='';
+let formDh='',queryDh='';
 ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  log.push(c.type);
  if(c.type==='navigate'&&c.kind==='flow'&&gate)await gate.promise;
@@ -20,6 +20,10 @@ ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  if(c.type==='prepare'){formDh=c.order.id;return [{prepared:true}];}
  if(c.type==='inspect')return [{matched:true,current:'已揽件',names:{sender:true,receiver:true}}];
  if(c.type==='readForm')return [{dh:formDh,fields:full(formDh),current:'已揽件'}];
+ if(c.type==='queryField'){queryDh=c.id;return [{fieldSelected:true}];}
+ if(c.type==='queryOrder')return [{queryRequested:true,token:'q'}];
+ if(c.type==='snapshot'&&c.kind==='query')return [{rows:[{id:queryDh,status:'已揽件'}],total:1,probeToken:'q',probeSettled:true}];
+ if(c.type==='closeQuery')return [{closed:true,cleared:1}];
  if(c.type==='armSubmission')return [{armed:true}];
  if(c.type==='submit')return [{submitted:true}];
  if(c.type==='confirmSubmit')return [{confirmed:true,via:'toast'}];
@@ -50,11 +54,11 @@ const tick=ms=>new Promise(r=>setTimeout(r,ms));
  let r=await call({type:'prepare',order});assert(r.ok,r.error);
  log.length=0;
  const peek=call({type:'statusOf',id:B},3);await tick(400);
- assert(!log.includes('readForm')&&!log.includes('portalState'),'令牌有效期内查看状态不得插队：'+log.join(','));
+ assert(!log.includes('queryField')&&!log.includes('portalState'),'令牌有效期内查看状态不得插队：'+log.join(','));
  r=await call({type:'submit',order,target:'已送达'});assert(r.ok,r.error);
  const submitAt=log.lastIndexOf('confirmSubmit');
  const p=await peek;assert(p.ok,p.error);
- assert(log.indexOf('readForm')>submitAt,'查看状态必须在提交确认之后才读表单');
+ assert(log.indexOf('queryField')>submitAt,'查看状态必须在提交确认之后才去快件查询');
 
  // 4) 同一工作台重新准备（重试路径）不会被自己的令牌卡住
  r=await call({type:'prepare',order});assert(r.ok,r.error);
