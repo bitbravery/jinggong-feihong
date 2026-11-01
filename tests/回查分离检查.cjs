@@ -17,13 +17,9 @@ const sync=w.slice(w.indexOf("msg.type==='syncFlowStatus'"),w.indexOf("msg.type=
 assert(sync.includes('closeFormTab'),'回查前要关掉残留的物流状态调整单');
 assert(sync.includes('没有打开“京工飞鸿两校快件系统”'),'业务标签没开要提示');
 
-// 4) 历史“查看原站状态”改走快件查询
+// 4) 历史“查看原站状态”保持原方式（打开调整单核对）
 const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='diagnose'"));
-assert(so.includes('queryOne(msg.id'),'状态回查要走快件查询按单号查');
-assert(!so.includes('formOrder('),'不再打开调整单逐单核对');
-assert(so.includes('没有这个单号'),'查不到要明确提示');
-
-// 5) 历史批量查看前先关残留调整单（statusPreflight）
-assert(/async function pumpStatus\(\)\{\s*\n\s*if\(statusBusy\)return;\s*\n\s*statusBusy=true;[\s\S]{0,200}statusPreflight/.test(live),'历史批量查看前要先清理调整单');
+assert(so.includes('formOrder(msg.id)'),'历史状态回查仍走调整单');
+assert(!so.includes('queryOne(msg.id'),'不再走快件查询');
 
 console.log('通过：读取/回查分离、已办手动回查、历史状态改走快件查询。');

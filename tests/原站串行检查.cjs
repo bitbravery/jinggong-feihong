@@ -54,11 +54,11 @@ const tick=ms=>new Promise(r=>setTimeout(r,ms));
  let r=await call({type:'prepare',order});assert(r.ok,r.error);
  log.length=0;
  const peek=call({type:'statusOf',id:B},3);await tick(400);
- assert(!log.includes('queryField')&&!log.includes('portalState'),'令牌有效期内查看状态不得插队：'+log.join(','));
+ assert(!log.includes('readForm')&&!log.includes('portalState'),'令牌有效期内查看状态不得插队：'+log.join(','));
  r=await call({type:'submit',order,target:'已送达'});assert(r.ok,r.error);
  const submitAt=log.lastIndexOf('confirmSubmit');
  const p=await peek;assert(p.ok,p.error);
- assert(log.indexOf('queryField')>submitAt,'查看状态必须在提交确认之后才去快件查询');
+ assert(log.indexOf('readForm')>submitAt,'查看状态必须在提交确认之后才读表单');
 
  // 4) 同一工作台重新准备（重试路径）不会被自己的令牌卡住
  r=await call({type:'prepare',order});assert(r.ok,r.error);

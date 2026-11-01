@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.212';
+const COMPONENT_VERSION = '0.9.213';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -746,15 +746,11 @@ mark('portal');
     return {opened:true,newTab:!!newTab};
    }
    if(msg.type==='statusOf'){
-     if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效单号');
-          // v0.9.211：改走「快件查询」按单号查，比打开调整单逐单核对快得多（查询结束会自动点红色错号+关闭查询）
-     const s=await queryOne(msg.id,{allowEmpty:true});
-     if(!s||s.total!==1)throw Error('原站「快件查询」里没有这个单号');
-     const st=(SourceMapping.normalize(s)[0]||{}).status||'';
-     if(!st)throw Error('原站没有返回该单的物流状态');
-     return {id:msg.id,status:st};
+          if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效单号');
+const order=await formOrder(msg.id);
+return {id:order.id,status:order.status,order};
     }
-   if(msg.type==='diagnose'){
+if(msg.type==='diagnose'){
     const portalOut=await run({type:'portalState'});
     const portal=portalOut.filter(r=>Array.isArray(r.tabs))[0]||null;
     const rowDumpOut=await run({type:'rowDump'});
