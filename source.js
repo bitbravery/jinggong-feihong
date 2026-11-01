@@ -505,12 +505,17 @@ function sourceAction(command){
    }
    window.__fhConfirmSeen={token:command.token,at:Date.now()};
    const box=hit[0],btn=fhOkBtn(box);
+ // v0.9.204：只要弹的是“提示信息”而不是「您确定要提交吗」，一律点确定关掉
+ if(btn&&!/您确定要提交吗|确定要提交/.test(text(box))){
+   fhDismiss(box);
+   return {waiting:true,seen:true,genericDismissed:true,diag:'已点「确定」关闭提示：'+text(box).replace(/\s+/g,' ').slice(0,50)};
+ }
    if(!btn)return {waiting:true,seen:true,buttons:hit.length,noBtn:true,diag:'弹窗里没有可见的「确定」按钮'+(hit[0]?'（'+fhName(hit[0])+'）':'')};
    if(fhOff(btn))return {waiting:true,seen:true,buttons:hit.length,off:true,diag:'「确定」按钮当前是禁用状态（'+fhName(btn)+'），等它可用后自动点'};
    let ps=window.__fhPressState;
    if(!ps||ps.token!==command.token){ps={token:command.token,tries:0,last:0,first:Date.now(),miniFired:false};window.__fhPressState=ps;delete window.__fhClickBase;}
-   const canPress=ps.tries<6&&(ps.tries===0||Date.now()-ps.last>=1500)&&Date.now()-ps.first<12000;
-   if(canPress&&(ps.tries===0||!fhReqs())){
+ const canPress=ps.tries<3&&(ps.tries===0||Date.now()-ps.last>=100)&&Date.now()-ps.first<10000;
+ if(canPress){
     ps.tries++;ps.last=Date.now();
     try{fhTop.__fhPressed={token:command.token,at:Date.now()};}catch{}
     try{const L=fhTop.__fhPressLog&&fhTop.__fhPressLog.token===command.token?fhTop.__fhPressLog:{token:command.token,times:[],buf:0,mini:false};L.times.push(Date.now());try{L.buf=(performance.getEntriesByType('resource')||[]).length;}catch{}fhTop.__fhPressLog=L;}catch{}
@@ -531,7 +536,7 @@ function sourceAction(command){
      }
      // MiniUI 连续复用同一办理页后，DOM 按键序列偶尔不再进入组件处理器。
      // 第三次仍无请求且弹窗未关闭时，直接走该按钮组件的 click 事件一次。
-     if(ps.tries===3&&!ps.miniFired&&!fhReqs()&&fhDialogs().length){
+ if(ps.tries===3&&!ps.miniFired&&fhDialogs().length){
       const component=window.mini?.get?.(target.id||btn.id);
       if(component&&typeof component.fire==='function'){
        ps.miniFired=true;try{if(fhTop.__fhPressLog&&fhTop.__fhPressLog.token===command.token)fhTop.__fhPressLog.mini=true;}catch{}
@@ -542,6 +547,10 @@ function sourceAction(command){
    }
    if(fhPressed(command.token)&&fhToast(/^提交成功$/,true)){delete window.__fhConfirmSeen;window.__fhPressState=null;try{delete fhTop.__fhPressed;}catch{}return {confirmed:true,via:'toast',resubmitted:!!(window.__fhDirtyRetry&&window.__fhDirtyRetry.count>0)};}
    if(!fhDialogs().length)return {waiting:true,seen:true,closedNoToast:true,pressed:fhPressed(command.token),tries:ps.tries};
+ if(ps.tries>=3){
+   if(Date.now()-ps.last<600)return {waiting:true,seen:true,stillOpen:true,tries:ps.tries,diag:'已点 3 次「确定」，等提示框关闭'+(ps.miniFired?'｜已调用 MiniUI 按钮事件':'')};
+   return {error:'提示框连续点 3 次「确定」仍未关闭，本单放弃。'};
+ }
    return {waiting:true,seen:true,buttons:hit.length,clickedButOpen:true,diag:fhDiag(btn,ps.tries>0)+'｜已按 '+ps.tries+' 次'+(ps.miniFired?'｜已调用 MiniUI 按钮事件':'')};
   }
   if(command.type==='confirmProbe'){

@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.203')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.204')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -133,7 +133,7 @@ function openChange(ids){pending=orders().filter(o=>ids.includes(o.id)&&!o.dupli
 async function submit(e){
  e.preventDefault();if(busy||!pending.length)return;if(statusBusy){toast('正在批量查看原站状态（'+Math.min(statusDone+1,statusTotal)+'/'+statusTotal+'），原站一次只能做一件事：请等它结束后再提交修改。');return;}if(!FeiHongWritePolicy.allowed(pending)){toast('所选记录含无效单号或重复单，禁止提交。');return;}const target=$('targetStatus').dataset.value||'';if(!statuses.includes(target)){toast('请先选择目标状态，再提交。');const first=$('targetStatus').querySelector('input[type=radio]');if(first)first.focus();return;}
  const targets=pending.filter(o=>o.status!==target);if(!targets.length){toast('目标与当前状态相同，无需提交。');return;}
- busy=true;writePhase='preparing';setStage('正在核对原站；此阶段可以取消，取消后不会提交。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
+ busy=true;writePhase='preparing';setStage('正在核对原站；此阶段可以取消，取消后不会提交。');const pre=await request({type:'statusPreflight'});if(pre&&pre.closed)toast('已关闭残留的“物流状态调整单” '+pre.closed+' 张。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
  const batchStartedAt=performance.now(),batchId='b'+Date.now();$('changeBatchSummary').textContent='正在提交申请，请耐心等待；批量修改期间请勿操作原站或扩展（需要人工清理时按提示操作）。';
  let doneCount=0;const failures=[];let consecutiveFails=0;const batchRows=[];
  try{

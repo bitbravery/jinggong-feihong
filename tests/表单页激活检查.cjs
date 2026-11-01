@@ -26,6 +26,8 @@ const armIdx=worker.indexOf("waitSource({type:'armSubmission'");
 assert(worker.lastIndexOf('await ensureFormActive(stage);',armIdx)>0,'点提交前要激活');
 
 // 5) 看到确认框立即点确定（首按不等网络静默），后续仍防连点
-assert(src.includes('if(canPress&&(ps.tries===0||!fhReqs()))'),'首按不再等网络静默，立即点确定');
+assert(src.includes('const canPress=ps.tries<3&&(ps.tries===0||Date.now()-ps.last>=100)'),'确认框最多点 3 次、间隔 0.1 秒');
+assert(src.includes('if(canPress){'),'看到弹窗立即点，不再等网络静默');
+assert(src.includes('提示框连续点 3 次'),'3 次仍未关要明确报错');
 
 console.log('通过：表单页激活校验接入准备/提交/改回；确认框首按立即点击。');

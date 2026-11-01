@@ -1,5 +1,5 @@
-// 确认要分次重按：首次按下可能太早（MiniUI 尚未就绪），因此每 ≥1.5 秒重按一次，最多 5 次；
-// 弹窗一关立即停，绝不在关闭后继续按。
+// v0.9.204：看到「提示信息」弹窗立即点确定；没反应就每 ≥0.1 秒再点，最多 3 次；
+// 3 次仍未关 → 报「提示框连续点 3 次」让后台关标签跳过本单。
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const src=fs.readFileSync(__dirname+'/../source.js','utf8');
 let t=1000,clicks=0,closed=false,toastOn=false;
@@ -20,31 +20,31 @@ vm.createContext(ctx);vm.runInContext(src,ctx);
 const act=ctx.module.exports.sourceAction;
 const cmd={type:'confirmSubmit',order:{id:'JGKD1'},target:'已送达',token:'R'};
 
-act(cmd);assert.equal(clicks,1,'首次应点一次');
-t=1200;act(cmd);assert.equal(clicks,1,'不到 1.5 秒不得重按');
-t=2500;act(cmd);assert.equal(clicks,2,'满 1.5 秒应重按');
-t=4000;act(cmd);t=5500;act(cmd);t=7000;act(cmd);t=8500;const r=act(cmd);
-assert.equal(clicks,6,'最多按 6 次，实际 '+clicks);
-assert(/已按 6 次/.test(r.diag||''),'诊断要写明按了几次');
-t=11000;act(cmd);assert.equal(clicks,6,'超过 6 次后不得再按');
-closed=true;
-// v0.9.177 契约变化：弹窗消失本身不算确认，要看到点确定后新出现的“提交成功”
-const gone=act(cmd);
-assert(gone&&!gone.confirmed&&gone.closedNoToast,'弹窗消失但没有“提交成功”，不得确认');
-toastOn=true;
-const done=act(cmd);
-assert(done&&done.confirmed,'点过确定且出现新的“提交成功”才算确认');toastOn=false;
-assert.equal(clicks,6,'关闭后不得再按');
-console.log('通过：首次点击 + 之后每 ≥1.5 秒重按、最多 6 次、关闭即停。');
-let resources=[];ctx.performance={getEntriesByType:()=>resources};
-for(let n=0;n<25;n++){closed=false;t+=2000;resources.push({name:'previous-submit',duration:10});ctx.window.__fhClickBase=0;const before=clicks;act({...cmd,token:'batch-'+n});assert.equal(clicks,before+1,'batch '+n);closed=true;act({...cmd,token:'batch-'+n});}
-console.log('通过：25 单确认的请求基线相互隔离。');
+// 1) 看到弹窗立刻点一次（不等网络静默）
+act(cmd);assert.equal(clicks,1,'看到弹窗应立即点一次');
+// 2) 0.1 秒内不重复
+t=1050;act(cmd);assert.equal(clicks,1,'不到 0.1 秒不得重按');
+t=1150;act(cmd);assert.equal(clicks,2,'满 0.1 秒应重按第 2 次');
+t=1260;act(cmd);assert.equal(clicks,3,'第 3 次点击');
+// 3) 3 次后仍在：600ms 内不放弃，之后明确报错
+t=1500;const waiting=act(cmd);assert.equal(clicks,3,'最多点 3 次');assert(waiting&&waiting.waiting,'3 次后先等它关闭');
+t=2200;const gave=act(cmd);
+assert(gave&&gave.error,'3 次仍未关应报错');assert(/提示框连续点 3 次/.test(gave.error),'错误要写明点了 3 次');
+assert.equal(clicks,3,'报错后不得再点');
 
+// 4) 弹窗关闭：没“提交成功”不算成功；有才算
+const tok='R';closed=true;t=5000;
+const gone=act({...cmd,token:tok});
+assert(gone&&!gone.confirmed&&gone.closedNoToast,'关掉但没提示不得确认');
+toastOn=true;const done=act({...cmd,token:tok});
+assert(done&&done.confirmed,'出现新的“提交成功”才确认');
+
+// 5) MiniUI 兜底：第 3 次点击时调一次组件事件
 let miniClicks=0;ctx.window.mini={get:id=>id==='mini-17'?{fire(type){if(type==='click')miniClicks++;}}:null};
-resources=[];closed=false;t+=2000;
-const stale={...cmd,token:'stale-miniui'};
-act(stale);t+=1500;act(stale);t+=1500;const staleResult=act(stale);
-assert.equal(miniClicks,1,'DOM 连续三次无请求时应调用一次 MiniUI 组件 click');
-assert(/已调用 MiniUI 按钮事件/.test(staleResult.diag||''),'诊断应记录 MiniUI 兜底');
-t+=1500;act(stale);assert.equal(miniClicks,1,'MiniUI 组件事件不得重复调用');
-console.log('通过：连续复用页面导致 DOM 点击失效时，第三次改走 MiniUI 组件事件且只调用一次。');
+closed=false;toastOn=false;t=9000;
+const tok3='R3';
+act({...cmd,token:tok3});t=9150;act({...cmd,token:tok3});t=9300;const third=act({...cmd,token:tok3});
+assert.equal(miniClicks,1,'第 3 次应调用一次 MiniUI 组件事件');
+assert(/已调用 MiniUI 按钮事件/.test(third.diag||''),'诊断要记录 MiniUI 兜底');
+
+console.log('通过：弹窗出现立即点确定，0.1 秒一次最多 3 次，仍不开则报错交后台关标签。');
