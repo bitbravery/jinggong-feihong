@@ -25,8 +25,6 @@ function sourceAction(command){
   try{window.addEventListener('unhandledrejection',e=>{const r=e&&e.reason;keep({m:String((r&&r.message)||r||'').slice(0,100),s:'Promise'});},true);}catch{}
  }
  const text=e=>(e?.innerText||e?.textContent||'').trim();
-  // v0.9.218：确认“当前 frame 对应的门户标签”是否在前台；不在就点它自己的标签并让调用方重试
-  const fhSelfTab=want=>{try{const d=window.top.document;const tabs=Array.from(d.querySelectorAll('.mini-tab'));if(!tabs.length)return true;const norm=s=>String(s||'').replace(/\s+/g,'');const hit=s=>want instanceof RegExp?want.test(norm(s)):norm(s).includes(norm(want));const act=tabs.find(t=>t.classList.contains('mini-tab-active'));if(act&&hit(text(act)))return true;const t=tabs.find(t=>hit(text(t)));if(!t)return true;t.click();return false;}catch{return true;}};
   // 人工验证：填完单号后在表单空白处单击一次即可触发联动，不需要回车
   const fhPoke=()=>{try{
    const box=document.getElementById('DH$text');
@@ -84,7 +82,6 @@ function sourceAction(command){
  }
  if(['queryField','queryOrder','queryAll','queryDateField','queryRecent'].includes(command.type)){
    if(!location.pathname.endsWith('/queryResult.htm')||new URL(location.href).searchParams.get('queryCode')!=='8y4xbat8bd5dygdtw7ncbwcayenmnckt')return null;
-   if(!fhSelfTab(/快件查询/))return {waiting:true,wrongTab:true};
    if(['queryField','queryOrder'].includes(command.type)&&!/^JGKD\d+$/.test(command.id||''))return {error:'无效查询单号'};
    // 加载遮罩分两种：盖住整页的照旧等；只盖住下方列表的（上次翻页没加载完、一直显示“加载中”），人工此时仍可改条件、点“查询”重新加载，
    // 所以列表遮罩连续出现超过 8 秒就当作卡住，继续填条件并点“查询”；8 秒内照旧等它自己结束。
@@ -268,8 +265,7 @@ function sourceAction(command){
     const service=tabs.find(t=>/^京工飞鸿两校(?:区)?快件系统$/.test(text(t)));
     const frames=[];let count=0;try{count=window.frames.length;}catch{}
     for(let i=0;i<count;i++){try{frames.push(window.frames[i].location.pathname);}catch{frames.push('跨域');}}
-    const act=tabs.find(t=>t.classList.contains('mini-tab-active'));
-    return {tabs:tabs.map(t=>text(t)),active:act?text(act):'',forms:forms.length,formActive:forms.some(t=>t.classList.contains('mini-tab-active')),service:!!service,serviceActive:!!service&&service.classList.contains('mini-tab-active'),frames};
+    return {tabs:tabs.map(t=>text(t)),forms:forms.length,formActive:forms.some(t=>t.classList.contains('mini-tab-active')),service:!!service,serviceActive:!!service&&service.classList.contains('mini-tab-active'),frames};
   }
   if(command.type==='frameReport'){
     const body=document.body?text(document.body):'';
@@ -278,7 +274,6 @@ function sourceAction(command){
   }
   if(command.type==='readForm'){
     if(!location.pathname.endsWith('/3c9e2b168f194a628014fa4dd672971e.htm'))return null;
-    if(!fhSelfTab(/物流状态调整单/))return {waiting:true,wrongTab:true};
     const ids=['DH','JJRGH','JJRXM','JJRDH','JJDZXQ','JJDZYL','JJDZFJH','SJRXM','SJRDH','SJXQDZ','SJDZYL','SJDZFJH'];
     const fields=Object.fromEntries(ids.map(id=>[id,value(id)]));
     const groups=[],keys=[];
@@ -364,7 +359,6 @@ function sourceAction(command){
   }
   if(command.type==='submitBare'){
     if(!location.pathname.endsWith('/3c9e2b168f194a628014fa4dd672971e.htm'))return null;
-    if(!fhSelfTab(/物流状态调整单/))return {waiting:true,wrongTab:true};
     if(!document.getElementById('DH$text')||!window.mini?.get?.('DH'))return {waiting:true};
     const id=command.order?.id;
     if(!/^JGKD\d+$/.test(id||''))return {error:'无效单号，未提交。'};
@@ -393,7 +387,6 @@ function sourceAction(command){
   }
   if(command.type==='clearTags'){
     if(!location.pathname.endsWith('/queryResult.htm')||new URL(location.href).searchParams.get('queryCode')!=='8y4xbat8bd5dygdtw7ncbwcayenmnckt')return null;
-    if(!fhSelfTab(/快件查询/))return {waiting:true,wrongTab:true};
     const actives=Array.from(document.querySelectorAll('#quick-tag-box .active,#quick-tag-box [class*="selected"],.query-tag-box'));
     if(!actives.length)return {active:0};
     const tag=actives[0];
@@ -403,7 +396,6 @@ function sourceAction(command){
   }
   if(command.type==='openForm'){
     if(!location.pathname.endsWith('/h8jpsdrafk3yxn3mdxt3dbgkekzxxiwt.htm'))return null;
-    if(!fhSelfTab(/京工飞鸿两校(?:区)?快件系统/))return {waiting:true,wrongTab:true};
     // 入口优先取唯一那个；MiniUI 面板延迟显示时也接受唯一的隐藏入口。
     const all=Array.from(document.querySelectorAll('li.bl-item[data-flowid="8a8082dd82875b1201828ba961ca0f27"][data-blname="物流状态调整单"]'));
     if(all.length>1)return {error:'发现多个物流状态调整办理入口，停止操作。'};
@@ -1102,7 +1094,6 @@ function sourceAction(command){
  if(['prepare','inspect','submit','pressEnter','pokeForm'].includes(command.type)){
    if(command.order?.duplicateOrder)return {error:'此单号在原站当前结果中重复，禁止按单号填写或提交。请先核查原站记录。'};
    if(!location.pathname.endsWith('/3c9e2b168f194a628014fa4dd672971e.htm'))return null;
-   if(!fhSelfTab(/物流状态调整单/))return {waiting:true,wrongTab:true};
    if(!document.getElementById('DH$text')||!window.mini?.get?.('DH'))return {waiting:true};
    const ids=['DH','JJRGH','JJRXM','JJRDH','JJDZXQ','JJDZYL','JJDZFJH','SJRXM','SJRDH','SJXQDZ','SJDZYL','SJDZFJH'];
    const collect=()=>Object.fromEntries(ids.map(id=>[id,value(id)]));
