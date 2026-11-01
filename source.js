@@ -615,13 +615,22 @@ function sourceAction(command){
  }
  if(command.type==='closeQuery'){
    const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
-   const cands=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14);
-   // 取最里层（宽度最小）的那个，避免点到外层容器
-   cands.sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width);
-   const el=cands[0];
-   if(!el)return {none:true};
-   for(const t of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));}catch{try{el.click();}catch{}}}
-   return {closed:true,label:text(el).slice(0,20)};
+   // 1) 先点条件行右侧的红色错号（删掉条件行）
+   const closeEl=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
+   let scope=closeEl;
+   for(let n=0;n<6&&scope&&scope.parentElement&&!/条件字段/.test(text(scope));n++)scope=scope.parentElement;
+   if(!scope||!/条件字段/.test(text(scope)))scope=document.body;
+   const shoot=el=>{for(const t of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));}catch{try{el.click();}catch{}}}};
+   let cleared=0;
+   for(let round=0;round<4;round++){
+     const x=Array.from(scope.querySelectorAll('*')).filter(vis).filter(el=>{const t=text(el).trim();return /^[×✕✖]$/.test(t)||(el.tagName==='IMG'&&/error|del|remove/i.test(String(el.className||'')));}).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
+     if(!x)break;
+     shoot(x);cleared++;
+   }
+   // 2) 再点「关闭查询」回到列表
+   if(!closeEl)return {cleared,none:true};
+   shoot(closeEl);
+   return {closed:true,cleared,label:text(closeEl).slice(0,20)};
  }
  if(command.type==='toastState'){
    const t=fhToast(/^提交成功$/,true);
