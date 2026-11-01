@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.217';
+const COMPONENT_VERSION = '0.9.219';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -28,6 +28,48 @@ async function ensureFormActive(stage){
  }
  throw Error('门户没有切到「物流状态调整单」（一直停在别的标签），本单未提交，已跳过。');
 }
+// v0.9.219：按用户 2026-11-02 定的规则——每个操作前先看门户上方标签是不是正确页面。
+// 不是正确页面时：等 0.1 秒 → 关掉残留的“物流状态调整单”（保存中绝不关，会卡门户）→ 点回正确标签 → 再继续下一步。
+// 切标签只在这里做；注入层只报告“自己是不是前台”，绝不自己点标签，避免来回抢标签把门户卡死。
+const PAGE_KINDS={form:{re:/物流状态调整单/,label:'物流状态调整单'},service:{re:/京工飞鸿两校(?:区)?快件系统/,label:'京工飞鸿两校快件系统'},query:{re:/快件查询/,label:'快件查询'},flow:{re:/【流程】/,label:'【流程】'}};
+const tabText=t=>String(t||'').replace(/\s+/g,'');
+async function readPortalState(){
+ const out=await run({type:'portalState'});
+ if(out.some(r=>r.timeout))throw Error('原站门户页面无响应（8秒），已停止这一步；原站未提交。');
+ const found=out.filter(r=>Array.isArray(r.tabs));
+ if(found.length>1)throw Error('未唯一识别门户页面，请确认原站停在同一门户页。');
+ return found[0]||null;
+}
+async function closeResidualForm(stage,check){
+ // 残留的调整单在保存中绝不关（0.9.195 的教训：关掉会卡“加载中”）；先等它保存完
+ if(await portalSaving()){if(stage)stage('残留的“物流状态调整单”还在保存，等它存完再关…');await waitSaved(stage,check);}
+ let st=await readPortalState();
+ for(let i=0;i<3&&st&&st.forms>0;i++){
+  if(stage)stage('关闭残留的“物流状态调整单”（'+st.forms+' 张）…');
+  try{await run({type:'closeFormTab'});}catch{}
+  await pause(100);
+  st=await readPortalState();
+ }
+ if(st&&st.forms>0)throw Error('残留的“物流状态调整单”关不掉（'+st.forms+' 张）；为避免卡住已停止这一步。请先到原站手动关掉它。');
+}
+async function ensurePortalPage(kind,stage,generation){
+ const spec=PAGE_KINDS[kind]||PAGE_KINDS.form;
+ const check=()=>{if(generation!==undefined&&generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');};
+ for(let i=0;i<25;i++){
+  check();
+  const st=await readPortalState();
+  if(!st)return true;
+  const active=tabText(st.active);
+  if(!active)return true; // 门户没报激活标签时无法判断，不拦（由每一步的 source 守卫兜底）
+  if(spec.re.test(active))return true;
+  // 顺序按用户要求：先等 0.1 秒 → 关掉残留调整单（目标不是调整单时）→ 点回正确标签
+  await pause(100);
+  if(kind!=='form')await closeResidualForm(stage,check);
+  try{await run({type:'navigate',kind});}catch{}
+  await pause(120);
+ }
+ throw Error('门户上方标签没有切到「'+spec.label+'」（一直停在别的页面），已停止这一步；原站未提交。请到原站确认后再试。');
+}
 async function waitSnapshot(kind,predicate=()=>true,label='原站列表',flowTab,budget=60000){const end=Date.now()+budget;let last;while(Date.now()<end){const out=await run({type:'snapshot',kind,flowTab});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);let results=out.filter(r=>r.rows);if(results.length>1&&kind==='flow'){const pref=results.filter(r=>flowTab&&r.active===flowTab);results=pref.length?pref:[results[0]];}else if(results.length>1)throw Error('发现多个候选列表，停止读取。');if(results.length){last=results[0];if(predicate(last))return last;}if(kind==='flow')flowStage(label+'：'+describeFlow(out)+(last?'；未就绪：'+notReady(last):''));await pause(200);}throw Error(label+'仍未完成加载（等待60秒；页码 '+(last?.page??'未知')+'，总数 '+(last?.total??'未知')+'）。已读取部分不算完整结果。');}
 async function snapshot(kind,flowTab){return waitSnapshot(kind,s=>kind!=='flow'||!flowTab||s.active===flowTab,'原站列表',flowTab);}
 function pageReady(s,page){if(s.page!==page||!s.pageSize||!Number.isInteger(s.total))return false;const expected=Math.max(0,Math.min(s.pageSize,s.total-(page-1)*s.pageSize));const seq=s.headers.findIndex(h=>h.replace(/\s/g,'')==='序号');return s.rows.length===expected&&(s.kind==='flow'||seq<0||s.rows.every((r,i)=>Number(r[seq])===(page-1)*s.pageSize+i+1));}
@@ -42,13 +84,16 @@ async function formOrder(id){
  for(let i=0;i<4&&portal.forms>0;i++){await run({type:'closeFormTab'}).catch(()=>{});await pause(500);portal=await readPortal();}
  if(portal.forms>0)reuseTab=true;
  if(!reuseTab){
+  await ensurePortalPage('service');
   await navigate('service');
-  await waitSource({type:'openForm'},'openRequested','原站物流状态调整单入口未加载完成');
+  await waitSource({type:'openForm'},'openRequested','原站物流状态调整单入口未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('service'));
  }
  await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现');
- await waitSource({type:'prepare',order:{id}},'prepared','原站状态表单未加载完成');
+ await ensurePortalPage('form');
+ await waitSource({type:'prepare',order:{id}},'prepared','原站状态表单未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('form'));
  const end=Date.now()+40000;let last=null;
  while(Date.now()<end){
+  await ensurePortalPage('form');
   const out=await run({type:'readForm'});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
   const f=out.find(r=>r&&r.fields);
   if(f){last=f;const vals=Object.values(f.fields);if(f.dh===id&&f.current&&vals.every(v=>v))break;}
@@ -334,11 +379,14 @@ async function pressNote(token){try{const p=(await run({type:'pressInfo',token})
 async function portalSaving(){try{return (await run({type:'portalBusy'})).some(r=>r&&r.busy);}catch{return false;}}
 // 点「确定」后像人工一样等：每轮 15 秒找“提交成功”或标签自动关闭；原站仍在“加载中”就继续等（最长 90 秒），
 // 期间不回查、不重试、不关标签。超过 90 秒仍在加载：报结果不明，不自动重试。
-async function confirmPatiently(command,label,onTick,alt,stage){
+async function confirmPatiently(command,label,onTick,alt,stage,generation){
  const hardEnd=Date.now()+90000;
+ const check=()=>{if(generation!==undefined&&generation!==writeGeneration)throw Object.assign(Error('已取消等待：本单提交已发出，结果不明；请稍后到原站核对，勿重复提交。'),{cancelled:true,unknown:true});};
  while(true){
-  try{return await waitSource(command,'confirmed',label,undefined,onTick,15000,alt);}
+  check();
+  try{return await waitSource(command,'confirmed',label,generation,onTick,15000,alt);}
   catch(e){
+   check();
    if(!/（已等待\d+秒/.test(e.message))throw e;
    if(!(await portalSaving()))throw e;
    if(Date.now()>=hardEnd){const x=Error('原站点「确定」后保存超过 90 秒仍在“加载中”，提交结果不明，勿重复提交；请等原站加载结束后到原站核对该单。');x.stillSaving=true;throw x;}
@@ -381,7 +429,7 @@ async function waitLinked(id,stage){
  }
  return null;
 }
-async function waitSource(command,flag,label,generation,onTick,budget=60000,alt){const end=Date.now()+budget;let detail='',holes=0,ticks=0,altTicks=0,seen=false,btn=-1,clicked=false,cdiag='',noToast=false;while(Date.now()<end){if(generation!==undefined&&generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');const out=await run(command);if(out.some(r=>r.timeout)){if(++holes>=4)throw Error('原站页面连续无响应（约30秒），已停止操作'+(generation!==undefined?'；原站尚未提交':'')+'。请检查原站是否卡在弹窗或加载中。');await pause(120);continue;}holes=0;const error=out.find(r=>r.error);if(error)throw Error(error.error);let done=out.filter(r=>r[flag]);if(done.length>1&&command.kind==='flow')done=[done[0]];else if(done.length>1)throw Error('发现多个匹配页面，停止操作。');if(done.length===1)return done[0];if(alt&&++altTicks%4===0){let ao=null;try{ao=await run(alt.command);}catch{}if(ao){const bad=ao.find(r=>r&&r.error&&/提交失败|保存失败|操作失败|系统错误|发生异常|不能提交/.test(r.error));if(bad)throw Error(bad.error);const good=ao.find(r=>r&&r[alt.flag]);if(good)return good;}}const hit=out.find(r=>r.seen!==undefined);if(hit){if(hit.seen)seen=true;if(hit.closedNoToast)noToast=true;if(typeof hit.buttons==='number')btn=hit.buttons;if(hit.clickedButOpen){clicked=true;if(hit.diag)cdiag=hit.diag;}}const miss=out.find(r=>r.mismatch);detail=miss?.mismatch?.join('、')||'';if(miss&&typeof miss.filled==='number')detail+=(detail?'；':'')+'已联动 '+miss.filled+'/12 个字段';if(onTick&&++ticks%20===0){try{await onTick(detail,miss);}catch{}}await pause(120);}throw Error(label+'（已等待'+Math.round(budget/1000)+'秒，'+(['confirmSubmit','submissionComplete'].includes(command.type)?'提交结果不明，勿重复提交':'未提交')+'）'+(command.type==='confirmSubmit'?(seen?(noToast?'；已点「确定」、确认框已关闭，但没有看到“提交成功”，调整单标签也没有自动关闭':clicked?'；已点击“确定”，但弹窗仍未关闭（'+(cdiag||'无诊断信息')+'）':'；弹窗已出现，但未识别到唯一的“确定”按钮（候选 '+btn+' 个）'):'；没有看到确认弹窗'):'')+(detail?'；未匹配字段：'+detail:['confirmSubmit','submissionComplete'].includes(command.type)?'；请人工回查原站状态。':'；请在原站打开物流状态调整单并确认字段出现后重试。'));}
+async function waitSource(command,flag,label,generation,onTick,budget=60000,alt,onWrongTab){const end=Date.now()+budget;let detail='',holes=0,ticks=0,altTicks=0,seen=false,btn=-1,clicked=false,cdiag='',noToast=false;while(Date.now()<end){if(generation!==undefined&&generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');const out=await run(command);if(out.some(r=>r.timeout)){if(++holes>=4)throw Error('原站页面连续无响应（约30秒），已停止操作'+(generation!==undefined?'；原站尚未提交':'')+'。请检查原站是否卡在弹窗或加载中。');await pause(120);continue;}holes=0;const error=out.find(r=>r.error);if(error)throw Error(error.error);if(onWrongTab&&out.some(r=>r&&r.wrongTab)){await onWrongTab();continue;}let done=out.filter(r=>r[flag]);if(done.length>1&&command.kind==='flow')done=[done[0]];else if(done.length>1)throw Error('发现多个匹配页面，停止操作。');if(done.length===1)return done[0];if(alt&&++altTicks%4===0){let ao=null;try{ao=await run(alt.command);}catch{}if(ao){const bad=ao.find(r=>r&&r.error&&/提交失败|保存失败|操作失败|系统错误|发生异常|不能提交/.test(r.error));if(bad)throw Error(bad.error);const good=ao.find(r=>r&&r[alt.flag]);if(good)return good;}}const hit=out.find(r=>r.seen!==undefined);if(hit){if(hit.seen)seen=true;if(hit.closedNoToast)noToast=true;if(typeof hit.buttons==='number')btn=hit.buttons;if(hit.clickedButOpen){clicked=true;if(hit.diag)cdiag=hit.diag;}}const miss=out.find(r=>r.mismatch);detail=miss?.mismatch?.join('、')||'';if(miss&&typeof miss.filled==='number')detail+=(detail?'；':'')+'已联动 '+miss.filled+'/12 个字段';if(onTick&&++ticks%20===0){try{await onTick(detail,miss);}catch{}}await pause(120);}throw Error(label+'（已等待'+Math.round(budget/1000)+'秒，'+(['confirmSubmit','submissionComplete'].includes(command.type)?'提交结果不明，勿重复提交':'未提交')+'）'+(command.type==='confirmSubmit'?(seen?(noToast?'；已点「确定」、确认框已关闭，但没有看到“提交成功”，调整单标签也没有自动关闭':clicked?'；已点击“确定”，但弹窗仍未关闭（'+(cdiag||'无诊断信息')+'）':'；弹窗已出现，但未识别到唯一的“确定”按钮（候选 '+btn+' 个）'):'；没有看到确认弹窗'):'')+(detail?'；未匹配字段：'+detail:['confirmSubmit','submissionComplete'].includes(command.type)?'；请人工回查原站状态。':'；请在原站打开物流状态调整单并确认字段出现后重试。'));}
 async function clearQueryTags(){
  for(let i=0;i<8;i++){
   const out=await run({type:'clearTags'});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
@@ -394,8 +442,9 @@ async function clearQueryTags(){
 }
 async function queryOneRaw(id,{allowEmpty=false}={}){
  await navigate('query');
+ await ensurePortalPage('query');
  await clearQueryTags();
- await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成');
+ await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('query'));
  const {token}=await waitSource({type:'queryOrder',id},'queryRequested','原站未能发起单号查询');
  const end=Date.now()+60000;while(Date.now()<end){const out=await run({type:'snapshot',kind:'query'});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);if(results.length>1)throw Error('原站存在多个查询页面');if(results.length===1){const s=results[0];if(s.total===0&&allowEmpty)return s;if(s.total!==1||s.rows.length!==1)throw Error('原站按单号查询命中 '+(s.total??'未知')+' 条，不是唯一一条，停止操作。'+(s.scope&&s.scope!=='沿用原站当前查询条件；当前页'?'；门户当前查询条件：'+s.scope:''));const orders=SourceMapping.normalize(s);if(orders[0].id!==id||orders[0].duplicateOrder)throw Error('回查单号不匹配或重复');return s;}await pause(250);}throw Error('原站按单号查询未完成，请人工核验。');
 }
@@ -573,6 +622,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const stage=text=>chrome.runtime.sendMessage({type:'readStage',readId:msg.readId,text}).catch(()=>{});
      stage('正在打开原站查询并设置每页条数…');
      await navigate('query');
+     await ensurePortalPage('query');
      let qFrames=[];const qEnd=Date.now()+8000;
      do{qFrames=await framePaths();if(qFrames.some(p=>p.endsWith('/queryResult.htm')))break;await pause(300);}while(Date.now()<qEnd);
      if(!qFrames.some(p=>p.endsWith('/queryResult.htm')))throw Error('门户里没有“快件查询”结果页（当前页面：'+(qFrames.map(pageName).join('、')||'未取到')+'）。请在该标签里点一次“查询”，或刷新门户页后重新点击飞鸿图标连接。');
@@ -617,6 +667,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  const statuses={};
  try{
   await navigate('query');
+  await ensurePortalPage('query');
   try{await clearQueryTags();}catch{}
   for(let i=0;i<ids.length;i++){
    const id=ids[i];
@@ -699,28 +750,35 @@ if(msg.type==='statusPreflight'){
 mark('portal');
      if(reuse){
        stage('切换到现有调整单标签…');
+       await ensurePortalPage('form',stage,generation);
        await ensureFormActive(stage);
      }else{
        stage('打开业务介绍页的办理入口…');
+       await ensurePortalPage('service',stage,generation);
        await navigate('service');
-       await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',generation);
+       await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',generation,undefined,60000,undefined,()=>ensurePortalPage('service',stage,generation));
      }
      stage('等待“物流状态调整单”标签出现…');
      try{await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现',generation);}
      catch(e){const inv=await inventory();throw Error(e.message+(inv?'；原站页面：'+inv:''));}
      mark('form');
+     await ensurePortalPage('form',stage,generation);
      await ensureFormActive(stage);
      try{await closeQueryPanel();}catch{}
+     await ensurePortalPage('form',stage,generation);
      stage('等待识别调整单输入框（最多 10 秒，尚未填写单号）…');
-     try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000);}
+     try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000,undefined,()=>ensurePortalPage('form',stage,generation));}
      catch(e){const inv=await inventory();let tabs='';try{const p2=await readPortal();tabs='；调整单标签 '+(p2.forms??'?')+' 张'+(p2.formActive?'（活动）':'');}catch{}throw Error(e.message+(inv?'；原站页面：'+inv:'')+tabs+(/未加载完成/.test(e.message)?'。若“物流状态调整单”标签已经消失，说明原站打开后又关闭了该表单，请看门户页面的提示。':''));}
      // 回车后没联动出订单信息时，每 1 秒补按一次回车，最多再补两次（共 3 次），仍无则跳过本单
            let matched=false,lastErr=null,names=null,freshRetry=false,attempt=0;
       while(attempt<3&&!matched){
+       check();
+       await ensurePortalPage('form',stage,generation);
        if(attempt){
         await pause(250);
         const al=(await run({type:'formAlert'}).catch(()=>[])).find(r=>r&&r.alert);
         if(al){try{await run({type:'closeFormTab'});}catch{}throw Error('原站提示「'+al.alert+'」；本单未提交，已跳过并继续下一单。');}
+        await ensurePortalPage('form',stage,generation);
         if(attempt===1)await run({type:'pokeForm'}).catch(()=>{});
         else await run({type:'pressEnter'}).catch(()=>{});
         stage('第 '+(attempt+1)+' 次触发联动（'+(attempt===1?'点空白':'回车')+'），等待订单信息…');
@@ -728,7 +786,7 @@ mark('portal');
         stage('单号已回车，等待订单信息…');
        }
        try{
-        const hit=await waitSource({type:'inspect',order:msg.order},'matched','触发联动后未出订单信息',generation,undefined,4000);
+        const hit=await waitSource({type:'inspect',order:msg.order},'matched','触发联动后未出订单信息',generation,undefined,4000,undefined,()=>ensurePortalPage('form',stage,generation));
         matched=true;names=hit&&hit.names||null;mark('linked'+(attempt+1));
        }catch(e){
         // 沿用的旧标签表单里可能还留着别的单/旧状态：关掉重开一次再试（首单常见）
@@ -736,11 +794,12 @@ mark('portal');
          freshRetry=true;attempt=0;stage('旧标签里的表单状态与工作台不一致，关掉重开一次…');
          try{await run({type:'closeFormTab'});}catch{}
          await pause(200);
+         await ensurePortalPage('service',stage,generation);
          await navigate('service');
-         await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',generation);
+         await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',generation,undefined,60000,undefined,()=>ensurePortalPage('service',stage,generation));
          await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现',generation);
-         await run({type:'navigate',kind:'form',force:true}).catch(()=>{});
-         await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000);
+         await ensurePortalPage('form',stage,generation);
+         await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000,undefined,()=>ensurePortalPage('form',stage,generation));
          continue;
         }
         if(!/未联动|未出订单信息|未加载完成/.test(e.message))throw e;
@@ -763,12 +822,19 @@ mark('portal');
     if(!preparedWrite||preparedWrite.owner!==sender.tab?.id||Date.now()-preparedWrite.at>120000||SourceMapping.fingerprint(preparedWrite.order)!==SourceMapping.fingerprint(msg.order)||preparedWrite.order.status!==msg.order.status){preparedWrite=null;throw Error('提交准备已失效，请重新核对。');}
     preparedWrite=null;
     const stage=text=>chrome.runtime.sendMessage({type:'writeStage',text}).catch(()=>{});
+    const generation=writeGeneration;
     const T0=Date.now(),timing={},mark=k=>{timing[k]=Date.now()-T0;};
+    const checkPre=()=>{if(generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');};
+    const cancelledAfterSubmit=()=>Object.assign(Error('已取消等待：本单提交已发出，结果不明；请稍后到原站核对，勿重复提交。'),{cancelled:true,unknown:true});
+     await ensurePortalPage('form',stage,generation);
      await ensureFormActive(stage);
-    await waitSource({type:'armSubmission',order:msg.order,target:msg.target},'armed','原站门户提交上下文未就绪');
+    checkPre();
+    await waitSource({type:'armSubmission',order:msg.order,target:msg.target},'armed','原站门户提交上下文未就绪',generation,undefined,60000,undefined,()=>ensurePortalPage('form',stage,generation));
     // 点提交前：各帧此刻看得见的“提交成功”标为旧的，之后只认点「确定」后新出现的
     let staleToast=0;try{staleToast=(await run({type:'toastMark'})).reduce((n,r)=>n+((r&&r.visible)||0),0);}catch{}
     const staleNote=staleToast?'；提交前页面上已有 '+staleToast+' 处“提交成功”字样（已忽略）':'';
+    await ensurePortalPage('form',stage,generation);
+    checkPre();
     stage('正在点击原站提交…');
     const out=await run({type:'submit',order:msg.order,target:msg.target});const error=out.find(r=>r.error);if(error)throw Error(error.error);if(out.filter(r=>r.submitted).length!==1)throw Error('原站表单不匹配或提交结果不明，勿自动重试。');
     mark('clicked');
@@ -791,7 +857,7 @@ mark('portal');
      stage(tip);
     };
     let confirmHit=null;
-    try{confirmHit=await confirmPatiently({type:'confirmSubmit',order:msg.order,target:msg.target,token:confirmToken},'原站提交确认未完成',confirmTick,{command:{type:'submissionComplete',order:msg.order,target:msg.target,token:confirmToken},flag:'submissionComplete'},stage);}
+    try{confirmHit=await confirmPatiently({type:'confirmSubmit',order:msg.order,target:msg.target,token:confirmToken},'原站提交确认未完成',confirmTick,{command:{type:'submissionComplete',order:msg.order,target:msg.target,token:confirmToken},flag:'submissionComplete'},stage,generation);}
     catch(e){
       if(/提示框连续点 3 次/.test(e.message)){try{await run({type:'closeFormTab'});}catch{}throw Error('提示框点了 3 次「确定」仍未关闭，已关闭“物流状态调整单”并跳过本单，继续下一单。');}
       if(e.stillSaving)throw Error(e.message+staleNote+'；'+(await pressNote(confirmToken)));
@@ -815,6 +881,7 @@ mark('portal');
     const sigEnd=Date.now()+15000;
     stage('等待门户完成：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
     while(Date.now()<sigEnd&&!(sawToast&&sawClosed)){
+      if(generation!==writeGeneration)throw cancelledAfterSubmit();
       await pause(120);
       if(!sawClosed){
         try{const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(st&&st.forms===0){sawClosed=true;closedAt=Date.now();}}catch{}
@@ -851,13 +918,15 @@ mark('portal');
      for(let i=0;i<3&&portal.forms>0;i++){stage('关闭遗留的调整单标签…');try{await run({type:'closeFormTab'});}catch{}await pause(120);portal=await readPortal();}
      if(portal.forms>0)stage('遗留的调整单标签关不掉，沿用现有标签继续…');
     stage('打开业务介绍页的办理入口…');
+    await ensurePortalPage('service',stage);
     await navigate('service');
-    await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成');
+    await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('service',stage));
     stage('等待“物流状态调整单”标签出现…');
     await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现');
     stage('填写完整单号并回车…');
+     await ensurePortalPage('form',stage);
      await ensureFormActive(stage);
-    await waitSource({type:'prepare',order:{id:msg.id}},'prepared','原站状态表单未加载完成');
+    await waitSource({type:'prepare',order:{id:msg.id}},'prepared','原站状态表单未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('form',stage));
     stage('等待原站联动出订单信息…');
     // 新表单“当前状态”默认勾着第一项：必须等联系人联动出来，读到的才是这一单的真实状态。
     const linked=await waitLinked(msg.id,stage);
@@ -866,7 +935,8 @@ mark('portal');
     if(cur===msg.from)return {already:true,current:cur};
     if(cur!==msg.to)throw Error('原站当前是「'+cur+'」，不是上次改成的「'+msg.to+'」，可能已被他人修改；为避免覆盖，未改回。');
     stage('选择目标状态并提交…');
-    await waitSource({type:'armSubmission',order:{id:msg.id},target:msg.from},'armed','原站门户提交上下文未就绪');
+    await ensurePortalPage('form',stage);
+    await waitSource({type:'armSubmission',order:{id:msg.id},target:msg.from},'armed','原站门户提交上下文未就绪',undefined,undefined,60000,undefined,()=>ensurePortalPage('form',stage));
     try{await run({type:'toastMark'});}catch{}
     const out=await run({type:'submitBare',order:{id:msg.id},target:msg.from,expect:msg.to});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
     if(!out.some(r=>r.submitted))throw Error('原站表单不匹配或提交结果不明，未改回。');
