@@ -8,7 +8,7 @@ function harness(residues){
     Date:Date,setTimeout:fn=>setImmediate(fn),
     chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async m=>{stages.push(m.text);}},storage:{session:{get:async()=>({sourceTabId:1})}},tabs:{update:async()=>{}},scripting:{executeScript:async()=>[]}}};
   vm.createContext(ctx);vm.runInContext(src,ctx);
-  ctx.fakeRun=async c=>{
+  ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
     if(c.type==='portalState')return [{tabs:[],forms:0,service:true,serviceActive:true,frames:[]}];
     if(c.type==='confirmResidue'){const v=residues[Math.min(residueCalls++,residues.length-1)];return [{residue:v}];}
     if(c.type==='confirmDismiss'){dismissed++;return [{dismissed:1,left:0}];}

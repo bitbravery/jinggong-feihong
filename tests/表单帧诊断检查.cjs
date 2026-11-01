@@ -5,7 +5,7 @@ const ctx={importScripts(){},FeiHongWritePolicy:policy,SourceMapping:{statuses:[
  Date:{now:()=>t},setTimeout:fn=>{t+=250;fn();},
  chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async()=>{}},storage:{session:{get:async()=>({sourceTabId:1})}},tabs:{update:async()=>{}},scripting:{executeScript:async()=>[]}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
-ctx.fakeRun=async c=>{
+ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  if(c.type==='portalState')return [{tabs:[],forms:0,service:true,serviceActive:true,frames:[]}];
  if(c.type==='navigate')return [{navigated:true}];
  if(c.type==='openForm')return [{openRequested:true}];

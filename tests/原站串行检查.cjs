@@ -11,7 +11,7 @@ const A='JGKD2026092036825',B='JGKD2026092036826';
 let gate=null;
 const full=id=>({DH:id,JJRGH:'1',JJRXM:'张三',JJRDH:'1',JJDZXQ:'良乡',JJDZYL:'1号楼',JJDZFJH:'101',SJRXM:'李四',SJRDH:'2',SJXQDZ:'中关村',SJDZYL:'2号楼',SJDZFJH:'202'});
 let formDh='';
-ctx.fakeRun=async c=>{
+ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  log.push(c.type);
  if(c.type==='navigate'&&c.kind==='flow'&&gate)await gate.promise;
  if(c.type==='portalState')return [{tabs:['京工飞鸿两校快件系统'],forms:0,service:true,serviceActive:true,frames:[]}];

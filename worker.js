@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.197';
+const COMPONENT_VERSION = '0.9.198';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -17,6 +17,17 @@ async function run(command){
  return result.map(r=>r.result).filter(Boolean);
 }
 async function navigate(kind){const out=await run({type:'navigate',kind});if(out.some(r=>r.timeout))throw Error('原站页面无响应（8秒），已停止本次操作；原站尚未提交。');const fail=out.find(r=>r.error);if(fail)throw Error(fail.error);}
+async function formActive(){try{const out=await run({type:'formActive'});return out.some(r=>r&&r.formActive);}catch{return false;}}
+// 门户标签必须真的切到“物流状态调整单”，否则填单号/提交都发生在看不见的旧页面上
+async function ensureFormActive(stage){
+ for(let i=0;i<12;i++){
+  try{await run({type:'navigate',kind:'form',force:true});}catch{}
+  if(await formActive())return true;
+  if(stage)stage('正在切到“物流状态调整单”标签…');
+  await pause(120);
+ }
+ throw Error('门户没有切到「物流状态调整单」（一直停在别的标签），本单未提交，已跳过。');
+}
 async function waitSnapshot(kind,predicate=()=>true,label='原站列表',flowTab,budget=60000){const end=Date.now()+budget;let last;while(Date.now()<end){const out=await run({type:'snapshot',kind,flowTab});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);let results=out.filter(r=>r.rows);if(results.length>1&&kind==='flow'){const pref=results.filter(r=>flowTab&&r.active===flowTab);results=pref.length?pref:[results[0]];}else if(results.length>1)throw Error('发现多个候选列表，停止读取。');if(results.length){last=results[0];if(predicate(last))return last;}if(kind==='flow')flowStage(label+'：'+describeFlow(out)+(last?'；未就绪：'+notReady(last):''));await pause(200);}throw Error(label+'仍未完成加载（等待60秒；页码 '+(last?.page??'未知')+'，总数 '+(last?.total??'未知')+'）。已读取部分不算完整结果。');}
 async function snapshot(kind,flowTab){return waitSnapshot(kind,s=>kind!=='flow'||!flowTab||s.active===flowTab,'原站列表',flowTab);}
 function pageReady(s,page){if(s.page!==page||!s.pageSize||!Number.isInteger(s.total))return false;const expected=Math.max(0,Math.min(s.pageSize,s.total-(page-1)*s.pageSize));const seq=s.headers.findIndex(h=>h.replace(/\s/g,'')==='序号');return s.rows.length===expected&&(s.kind==='flow'||seq<0||s.rows.every((r,i)=>Number(r[seq])===(page-1)*s.pageSize+i+1));}
@@ -481,7 +492,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
 mark('portal');
      if(reuse){
        stage('切换到现有调整单标签…');
-       await run({type:'navigate',kind:'form',force:true}).catch(()=>{});
+       await ensureFormActive(stage);
      }else{
        stage('打开业务介绍页的办理入口…');
        await navigate('service');
@@ -491,7 +502,7 @@ mark('portal');
      try{await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现',generation);}
      catch(e){const inv=await inventory();throw Error(e.message+(inv?'；原站页面：'+inv:''));}
      mark('form');
-     await run({type:'navigate',kind:'form',force:true}).catch(()=>{});
+     await ensureFormActive(stage);
      stage('等待识别调整单输入框（最多 10 秒，尚未填写单号）…');
      try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000);}
      catch(e){const inv=await inventory();let tabs='';try{const p2=await readPortal();tabs='；调整单标签 '+(p2.forms??'?')+' 张'+(p2.formActive?'（活动）':'');}catch{}throw Error(e.message+(inv?'；原站页面：'+inv:'')+tabs+(/未加载完成/.test(e.message)?'。若“物流状态调整单”标签已经消失，说明原站打开后又关闭了该表单，请看门户页面的提示。':''));}
@@ -545,6 +556,7 @@ mark('portal');
     preparedWrite=null;
     const stage=text=>chrome.runtime.sendMessage({type:'writeStage',text}).catch(()=>{});
     const T0=Date.now(),timing={},mark=k=>{timing[k]=Date.now()-T0;};
+     await ensureFormActive(stage);
     await waitSource({type:'armSubmission',order:msg.order,target:msg.target},'armed','原站门户提交上下文未就绪');
     // 点提交前：各帧此刻看得见的“提交成功”标为旧的，之后只认点「确定」后新出现的
     let staleToast=0;try{staleToast=(await run({type:'toastMark'})).reduce((n,r)=>n+((r&&r.visible)||0),0);}catch{}
@@ -640,6 +652,7 @@ mark('portal');
     stage('等待“物流状态调整单”标签出现…');
     await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现');
     stage('填写完整单号并回车…');
+     await ensureFormActive(stage);
     await waitSource({type:'prepare',order:{id:msg.id}},'prepared','原站状态表单未加载完成');
     stage('等待原站联动出订单信息…');
     // 新表单“当前状态”默认勾着第一项：必须等联系人联动出来，读到的才是这一单的真实状态。

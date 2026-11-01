@@ -47,7 +47,7 @@ function worker(scn){
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
  const order={id:'JGKD20221123192713',status:'订单申请'};
  const saving=()=>!!scn.busyUntil&&time<scn.busyUntil;
- ctx.fakeRun=async c=>{log.push(c.type);
+ ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];log.push(c.type);
   if(c.type==='portalBusy')return [{busy:saving(),path:'/EIP/x/openCooperative.htm'},{busy:false,path:'/EIP/x/framework.htm'}];
   if(c.type==='portalState')return [{tabs:['京工飞鸿两校快件系统'],forms:scn.leftoverForm&&saving()?1:0,service:true}];
   if(c.type==='closeFormTab'){if(saving())log.push('在保存中关标签！');return [{closed:1}];}

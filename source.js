@@ -210,10 +210,20 @@ function sourceAction(command){
  if(command.type==='navigate'){
    if(window!==top)return null;
    const label=command.kind==='query'?'快件查询':command.kind==='service'?'京工飞鸿两校快件系统':command.kind==='form'?'物流状态调整单':'【流程】';
-   const tab=Array.from(document.querySelectorAll('.mini-tab')).find(t=>text(t)===label||(command.kind==='service'&&/^京工飞鸿两校(?:区)?快件系统$/.test(text(t))));
+   const norm=s=>String(s||'').replace(/\s+/g,'');
+ const tab=Array.from(document.querySelectorAll('.mini-tab')).find(t=>{const v=norm(text(t));return v===norm(label)||(command.kind==='service'&&/^京工飞鸿两校(?:区)?快件系统$/.test(v));});
    if(!tab&&command.kind==='form')return {waiting:true};
    if(!tab)return {error:'原站尚未打开“'+label+'”标签，请先在原站打开它。'};
    if(command.force||!tab.classList.contains('mini-tab-active'))tab.click();return {navigated:true};
+ }
+ if(command.type==='formActive'){
+  if(window!==top||!location.pathname.endsWith('/mixportal/framework.htm'))return null;
+  const norm=s=>String(s||'').replace(/\s+/g,'');
+  const tabs=Array.from(document.querySelectorAll('.mini-tab'));
+  const act=tabs.find(t=>t.classList.contains('mini-tab-active'));
+  const actText=act?norm(text(act)):'';
+  const forms=tabs.filter(t=>norm(text(t)).includes('物流状态调整单'));
+  return {formActive:!!act&&actText.includes('物流状态调整单'),active:actText,forms:forms.length};
  }
  if(['armSubmission','submissionComplete'].includes(command.type)){
    if(window!==top||!location.pathname.endsWith('/mixportal/framework.htm'))return null;
@@ -500,7 +510,7 @@ function sourceAction(command){
    let ps=window.__fhPressState;
    if(!ps||ps.token!==command.token){ps={token:command.token,tries:0,last:0,first:Date.now(),miniFired:false};window.__fhPressState=ps;delete window.__fhClickBase;}
    const canPress=ps.tries<6&&(ps.tries===0||Date.now()-ps.last>=1500)&&Date.now()-ps.first<12000;
-   if(canPress&&!fhReqs()){
+   if(canPress&&(ps.tries===0||!fhReqs())){
     ps.tries++;ps.last=Date.now();
     try{fhTop.__fhPressed={token:command.token,at:Date.now()};}catch{}
     try{const L=fhTop.__fhPressLog&&fhTop.__fhPressLog.token===command.token?fhTop.__fhPressLog:{token:command.token,times:[],buf:0,mini:false};L.times.push(Date.now());try{L.buf=(performance.getEntriesByType('resource')||[]).length;}catch{}fhTop.__fhPressLog=L;}catch{}

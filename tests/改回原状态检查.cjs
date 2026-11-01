@@ -11,7 +11,7 @@ const ctx={importScripts(){},FeiHongWritePolicy:policy,SourceMapping:{statuses:[
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
 const ID='JGKD2026092036825';
 let current='已送达',forms=1,linkAfter=0,submitCmd=null;
-ctx.fakeRun=async c=>{
+ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  calls.push(c.type);
  if(c.type==='portalState')return [{tabs:['京工飞鸿两校快件系统','物流状态调整单'],forms,formActive:false,service:true,serviceActive:true,frames:[]}];
  if(c.type==='closeFormTab'){forms=Math.max(0,forms-1);return [{closed:1}];}

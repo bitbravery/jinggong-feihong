@@ -7,7 +7,7 @@ const ctx={importScripts(){},FeiHongWritePolicy:policy,SourceMapping:{statuses:[
  chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async m=>{stages.push(m.text);}},storage:{session:{get:async()=>({sourceTabId:1})}},tabs:{update:async()=>{}},scripting:{executeScript:async()=>[]}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
 const order={id:'JGKD2026092136917',status:'订单申请'};
-ctx.fakeRun=async c=>{
+ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  if(c.type==='portalState')return [{tabs:[],forms:0,service:true,serviceActive:true,frames:[]}];
  if(c.type==='closeFormTab')return [{closed:0}];
  if(c.type==='navigate')return [{navigated:true}];

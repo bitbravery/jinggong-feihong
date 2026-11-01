@@ -5,7 +5,7 @@ const ctx={importScripts(){},FeiHongWritePolicy:policy,SourceMapping:{statuses:[
  setTimeout:fn=>setImmediate(()=>{if(stuck&&stages.some(x=>/已暂停/.test(x)))forms=0;fn();}),
  chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async m=>{stages.push(m.text);}},storage:{session:{get:async()=>({sourceTabId:1})}},tabs:{update:async()=>{}},scripting:{executeScript:async()=>[]}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
-ctx.fakeRun=async c=>{
+ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  calls.push(c.type);
  if(c.type==='portalState')return [{tabs:['快件查询','京工飞鸿两校快件系统'],forms,service,serviceActive:true,frames:[]}];
  if(c.type==='closeFormTab'){if(!stuck)forms=Math.max(0,forms-1);return [{closed:1}];}
