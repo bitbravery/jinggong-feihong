@@ -285,3 +285,15 @@ html{font-size:var(--page-fs,14px)}
 /* v0.9.202：整页不得横向滚动；侧栏是 position:fixed，页面一横向滚动正文就会钻到侧栏下面 */
 html,body{overflow-x:hidden}
 main{min-width:0}
+
+/* v0.9.203：改状态弹窗更紧凑，目标状态行字号统一 */
+.change-hint{margin:0 0 8px;font-size:13px}
+.change-count{color:var(--muted);font-weight:400}
+.change-summary{max-height:150px;overflow:auto;padding:9px 11px;font-size:12px;line-height:1.85}
+#changeForm>.status-picker-field{margin:10px 0 8px;gap:10px}
+#changeForm .status-picker-label{font-size:13px;color:var(--ink)}
+#changeForm .status-option{font-size:13px;padding:9px 4px}
+#changeForm .dialog-rules{font-size:11.5px;line-height:1.55;margin:6px 0 0;padding-left:17px}
+#changeForm .dialog-rules li{margin:1px 0}
+#changeDialog{max-height:calc(100vh - 28px);padding:20px 22px}
+#changeDialog .dialog-heading h2{font-size:19px}
