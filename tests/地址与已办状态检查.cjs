@@ -15,10 +15,10 @@ assert(/#queryRow\{flex-wrap:wrap!important/.test(css),'查询条件行可换行
 
 // 3) 已办状态校正
 assert(w.includes("msg.type==='syncFlowStatus'"),'后台要能按单号核对实际状态');
-assert(w.includes("queryOne(id,{allowEmpty:true})"),'核对要回快件查询');
+assert(w.includes("waitSource({type:'queryField',id}"),'核对要回快件查询（按单号查）');
 assert(!live.includes("if(flowTab==='已办'&&fresh.length)"),'读取时只读取，不再自动回查状态');
-assert(live.includes('flowSyncBtn.onclick'),'已办页要有“实际状态回查”按钮');
-assert(/currentView==='flow'&&flowTab==='已办'/.test(live),'按钮只在已办页出现');
+assert(live.includes('data-sync'),'“实际状态回查”按钮要放进流程标签行');
+assert(live.includes('runSyncFlowStatus'),'点击后才回查');
 assert(live.includes("request({type:'syncFlowStatus',ids})"),'点击后才调用回查命令');
 assert(live.includes("statusSource:'query'"),'回查到的行要标来源');
 assert(live.includes("m.type==='statusSync'"),'要显示回查进度');

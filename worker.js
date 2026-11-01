@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.213';
+const COMPONENT_VERSION = '0.9.214';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -457,21 +457,40 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const first=await readPage('first');return {...first,dateRange:range,scope:'下单时间 '+range.from+' 至 '+range.to+'，所有物流状态'};
    }
     if(msg.type==='syncFlowStatus'){
-          // 回查前先关掉“物流状态调整单”等没用的页面，避免影响查询
-     {const out=await run({type:'portalState'});const portal=out.filter(r=>Array.isArray(r.tabs))[0];
-      if(!portal||!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签，无法回查。');
-      for(let i=0;i<3&&portal.forms>0;i++){try{await run({type:'closeFormTab'});}catch{}await pause(120);const p2=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(p2)portal=p2;}
-     }
-const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
-     const statuses={};
-     for(let i=0;i<ids.length;i++){
-      const id=ids[i];
-      try{const s=await queryOne(id,{allowEmpty:true});const st=s&&s.total===1?(SourceMapping.normalize(s)[0]||{}).status:'';if(st)statuses[id]=st;}catch{}
-      try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||''});}catch{}
-     }
-     return {statuses,total:ids.length,done:Object.keys(statuses).length};
+ const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
+ // 回查前先关掉“物流状态调整单”等没用的页面，避免影响查询
+ {const out=await run({type:'portalState'});const portal=out.filter(r=>Array.isArray(r.tabs))[0];
+  if(!portal||!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签，无法回查。');
+  for(let i=0;i<3&&portal.forms>0;i++){try{await run({type:'closeFormTab'});}catch{}await pause(120);const p2=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(p2)portal=p2;}
+ }
+ const statuses={};
+ try{
+  await navigate('query');
+  try{await clearQueryTags();}catch{}
+  for(let i=0;i<ids.length;i++){
+   const id=ids[i];
+   try{
+    await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成');
+    const {token}=await waitSource({type:'queryOrder',id},'queryRequested','原站未能发起单号查询');
+    const end=Date.now()+60000;
+    while(Date.now()<end){
+     const out=await run({type:'snapshot',kind:'query'});
+     if(out.some(r=>r.timeout)){await pause(250);continue;}
+     const error=out.find(r=>r.error);if(error)throw Error(error.error);
+     const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);
+     if(results.length===1){const s=results[0];if(s.total===1){const st=(SourceMapping.normalize(s)[0]||{}).status;if(st)statuses[id]=st;}break;}
+     await pause(200);
     }
-    if(msg.type==='statusPreflight'){
+   }catch{}
+   try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||''});}catch{}
+  }
+ }finally{
+  // 批量全部查完，最后统一“先点红色错号、再点关闭查询”
+  try{await closeQueryPanel();}catch{}
+ }
+ return {statuses,total:ids.length,done:Object.keys(statuses).length};
+}
+if(msg.type==='statusPreflight'){
      const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法读取原站状态。');return found[0];};
      let portal=await readPortal();
      if(!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签。请先在门户打开它（点一次办理入口即可），再开始批量修改。');
