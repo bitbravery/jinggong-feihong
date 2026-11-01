@@ -19,3 +19,8 @@ desktop.ini
 .vscode/
 .idea/
 node_modules/
+
+# 临时补丁脚本（Chrome 不允许扩展目录出现 _ 开头文件）
+_*.cjs
+_*.ps1
+_*.txt
