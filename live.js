@@ -13,7 +13,7 @@ function setStage(t){stageText=t;renderStage();}
 function tagText(){return batchTotal>1?(batchIndex+'/'+batchTotal+' '):'';}
 function setOrderState(id,text,kind){try{const el=document.querySelector('.cs-state[data-state="'+CSS.escape(String(id))+'"]');if(!el)return;el.textContent=text;el.dataset.kind=kind||'';}catch{}}
 function setOrderNote(id,note){try{const row=document.querySelector('.cs-row[data-row="'+CSS.escape(String(id))+'"]');if(row&&note)row.title=note;}catch{}}
-if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';}});
+if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
 let readProgress={rows:0,total:null,page:0,pages:null,percent:null,started:0,note:''};
 function drawReadProgress(){const p=readProgress,seconds=p.started?((performance.now()-p.started)/1000).toFixed(1):'0.0';$('bulkText').textContent=`已查询 ${p.rows}/${p.total??'—'} 行，第 ${p.page}/${p.pages??'—'} 页，用时 ${seconds} 秒，进度 ${p.percent===null?'待计算':p.percent+'%'}${p.note?' · '+p.note:''}`;}
 let localPage=1, pendingCampus=null, bulkCancelled=false;
@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.206')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.207')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -326,11 +326,12 @@ async function readFlows(pages=5){
   const fresh=parts.flatMap(p=>SourceMapping.normalize(p));records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...fresh];
   // v0.9.206：原站把“已办”的状态一律写成订单申请，必须回「快件查询」核对真实状态
   if(flowTab==='已办'&&fresh.length){
+   try{render();}catch{}
    try{
     $('bulkText').textContent='正在到「快件查询」核对已办的实际状态…';drawReadProgress();
     const ids=[...new Set(fresh.map(o=>o.id))];
     const synced=await request({type:'syncFlowStatus',ids});
-    if(synced&&synced.statuses){let n=0;records.flow=records.flow.map(o=>o.flow==='已办'&&synced.statuses[o.id]?(n++,{...o,status:synced.statuses[o.id],statusSource:'query'}):o);render();if(n)toast('已按「快件查询」校正 '+n+' 单实际状态。',4000);}
+    if(synced&&synced.statuses){let n=0;records.flow=records.flow.map(o=>o.flow==='已办'&&synced.statuses[o.id]?(n++,{...o,status:synced.statuses[o.id],statusSource:'query'}):o);render();if(n)toast('已按「快件查询」校正 '+n+' 单实际状态。',4000);}render();
    }catch(err){toast('已办状态校正失败：'+err.message,6000);}
   }
   snapshots.flow={kind:'flow',bulk:true,complete:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'待办 / 已办 / 抄送给我 全部页面'};

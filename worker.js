@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.206';
+const COMPONENT_VERSION = '0.9.207';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -454,7 +454,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      for(let i=0;i<ids.length;i++){
       const id=ids[i];
       try{const s=await queryOne(id,{allowEmpty:true});const st=s&&s.total===1?(SourceMapping.normalize(s)[0]||{}).status:'';if(st)statuses[id]=st;}catch{}
-      try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id});}catch{}
+      try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||''});}catch{}
      }
      return {statuses,total:ids.length,done:Object.keys(statuses).length};
     }

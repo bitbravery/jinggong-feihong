@@ -20,4 +20,11 @@ assert(live.includes("request({type:'syncFlowStatus',ids})"),'前端要调用校
 assert(live.includes("statusSource:'query'"),'校正过的行要标来源');
 assert(live.includes("m.type==='statusSync'"),'要显示核对进度');
 
+
+// v0.9.207：顶部工具行/查询条件行不换行；已办先渲染再回填
+assert(/\.header-layout-controls\{flex-wrap:nowrap!important/.test(css),'诊断/页面字号/密度/恢复默认列宽要在同一行');
+assert(/#queryRow\{flex-wrap:nowrap!important/.test(css),'查询条件行不换行');
+assert(/#queryRow input\[type=date\]\{width:116px/.test(css),'日期框按内容收紧');
+assert(/if\(flowTab==='已办'&&fresh\.length\)\{\n\s*try\{render\(\);\}catch\{\}/.test(live),'读完已办要先显示列表再核对');
+assert(/hit\.statusSource='query'/.test(live),'核对进度要逐条回填到列表');
 console.log('通过：校区进括号、查询行自适应、已办状态回快件查询校正。');
