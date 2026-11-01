@@ -19,7 +19,8 @@ for(const v of ['flow','orders','settings','history','tips']){
 assert(/\[data-view=tips\]:before\{content:'⚠'\}/.test(css),'「重要提示」折叠图标应为 ⚠');
 
 assert(live.includes("$('flowPagesWrap').hidden=v!=='flow'"),'“读取前 N 页”只应在流程页显示');
-// v0.9.202：整页禁止横向滚动，避免正文钻到固定侧栏下面
-assert(/html,body\{overflow-x:hidden\}/.test(css),'整页不应横向滚动');
-assert(/侧栏压住标题|浏览器缩放被改了/.test(html),'重要提示要说明缩放错位怎么恢复');
+// v0.9.205：撤回 0.9.202 的整页横向滚动限制（用户要求）
+assert(!/html,body\{overflow-x:hidden\}/.test(css),'不再强制整页禁止横向滚动');
+// 表格自适应宽度
+assert(/\.style\.width='100%'/.test(fs.readFileSync(__dirname+'/../table-layout.js','utf8')),'快件表要始终撑满容器');
 console.log('通过：读取日期段入口已隐藏；折叠模式下「重要提示」图标已补齐。');

@@ -282,9 +282,6 @@ html{font-size:var(--page-fs,14px)}
 #parcelTable tbody tr.row-selected:hover>td{background:#e2f1e9}
 #parcelTable tbody tr.row-selected td:first-child{box-shadow:inset 3px 0 0 var(--green)}
 
-/* v0.9.202：整页不得横向滚动；侧栏是 position:fixed，页面一横向滚动正文就会钻到侧栏下面 */
-html,body{overflow-x:hidden}
-main{min-width:0}
 
 /* v0.9.203：改状态弹窗更紧凑，目标状态行字号统一 */
 .change-hint{margin:0 0 8px;font-size:13px}
@@ -297,3 +294,7 @@ main{min-width:0}
 #changeForm .dialog-rules li{margin:1px 0}
 #changeDialog{max-height:calc(100vh - 28px);padding:20px 22px}
 #changeDialog .dialog-heading h2{font-size:19px}
+
+/* v0.9.205：撤回 0.9.203 的“弹窗限高/列表压矮”，恢复原尺寸 */
+.change-summary{max-height:220px;padding:12px;font-size:12px;line-height:2}
+#changeDialog{max-height:none;padding:26px}

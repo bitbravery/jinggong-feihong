@@ -24,7 +24,7 @@ assert(/#changeForm \.status-option\{font-size:13px;padding:9px 4px\}/.test(css)
 const ol=html.slice(html.indexOf('<ol class="dialog-rules compact">'),html.indexOf('</ol>',html.indexOf('<ol class="dialog-rules compact">')));
 const rules=(ol.match(/<li>/g)||[]).length;
 assert(rules<=3,'提示最多 3 条，当前 '+rules);
-assert(/\.change-summary\{max-height:150px/.test(css),'核对列表变矮，避免整页滚动');
-assert(/#changeDialog\{max-height:calc\(100vh - 28px\)/.test(css),'弹窗高度不超过一屏');
+assert(/\.change-summary\{max-height:220px/.test(css),'核对列表恢复 220px；不再压矮');
+assert(/#changeDialog\{max-height:none;padding:26px\}/.test(css),'弹窗恢复原内边距，不再限制高度');
 
 console.log('通过：操作原因已删、单数移到顶部、目标状态字号统一、提示精简、弹窗尽量一屏。');

@@ -12,7 +12,7 @@
  function defaults(){const available=Math.max(700,table.parentElement.clientWidth||1100);const values=ratios.map(r=>Math.floor(available*r));values[7]+=available-values.reduce((a,b)=>a+b,0);return values;}
  widths=defaults();
  function save(){try{localStorage.setItem(key,JSON.stringify({widths,density:density.value,autoFit,font:fontSel.value,fontCustom:fontCustom.value}));}catch{}}
- function apply(){cols.forEach((c,i)=>c.style.width=widths[i]+'px');table.style.width=widths.reduce((a,b)=>a+b,0)+'px';table.dataset.density=density.value;}
+ function apply(){const total=widths.reduce((a,b)=>a+b,0)||1;cols.forEach((c,i)=>c.style.width=(widths[i]/total*100).toFixed(4)+'%');table.style.width='100%';table.dataset.density=density.value;}
  try{const saved=JSON.parse(localStorage.getItem(key));if(saved?.autoFit===false&&saved?.widths?.length===8&&saved.widths.every(w=>Number.isFinite(w)&&w>=40&&w<=900)){widths=saved.widths;autoFit=false;}if(['compact','standard','loose'].includes(saved?.density))density.value=saved.density;if(saved&&saved.font){fontSel.value=saved.font;if(saved.font==='custom'){fontCustom.hidden=false;fontCustom.value=saved.fontCustom||14;}}}catch{}
  headers.forEach((th,i)=>{
   const handle=document.createElement('span');handle.className='column-resizer';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','vertical');handle.setAttribute('aria-label','调整'+th.textContent+'列宽，左右方向键微调');th.append(handle);
@@ -24,7 +24,7 @@
  density.onchange=()=>{apply();save();};
  fontSel.onchange=()=>{fontCustom.hidden=fontSel.value!=='custom';if(fontSel.value==='custom'){fontCustom.focus();}applyFont();save();};
  fontCustom.oninput=()=>applyFont();
- try{window.FeiHongPageFont.restore();}catch{}document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();apply();}}).observe(table.parentElement);apply();
+ try{window.FeiHongPageFont.restore();}catch{}document.getElementById('resetColumns').onclick=()=>{autoFit=true;widths=defaults();apply();save();};new ResizeObserver(()=>{if(autoFit&&table.parentElement.clientWidth){widths=defaults();}apply();}).observe(table.parentElement);apply();
 })();
 (()=>{
  // 历史表 6 列：勾选 / 修改时间 / 快件 / 原→新状态 / 处理 / 操作与结果（比例与 index.html 的 colgroup 一致）。
@@ -32,7 +32,7 @@
  const table=document.querySelector('.history-table'),cols=[...table.querySelectorAll('col')],heads=[...table.querySelectorAll('th')],key='feihong-history-widths-v2',ratios=[3,9,18,20,20,30];let widths=null;
  const minOf=i=>i===0?32:80;
  try{const saved=JSON.parse(localStorage.getItem(key));if(Array.isArray(saved)&&saved.length===cols.length&&saved.every((w,i)=>Number.isFinite(w)&&w>=minOf(i)&&w<=1400))widths=saved;}catch{}
- function apply(){cols.forEach((c,i)=>c.style.width=widths?widths[i]+'px':ratios[i]+'%');table.style.width=widths?widths.reduce((a,b)=>a+b,0)+'px':'100%';}
+ function apply(){if(!widths){cols.forEach((c,i)=>c.style.width=ratios[i]+'%');table.style.width='100%';return;}const total=widths.reduce((a,b)=>a+b,0)||1;cols.forEach((c,i)=>c.style.width=(widths[i]/total*100).toFixed(4)+'%');table.style.width='100%';}
  function save(){try{localStorage.setItem(key,JSON.stringify(widths));}catch{}}
  heads.forEach((th,i)=>{if(i===0)return;/* 勾选列不提供拖动 */const grip=document.createElement('span');grip.className='column-resizer';grip.tabIndex=0;grip.setAttribute('role','separator');grip.setAttribute('aria-label','调整'+th.textContent+'列宽');grip.setAttribute('aria-orientation','vertical');th.append(grip);
  function resize(w){if(!widths)widths=heads.map((h,j)=>Math.max(minOf(j),h.getBoundingClientRect().width));widths[i]=Math.max(minOf(i),Math.min(1400,w));apply();}
