@@ -65,7 +65,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.199')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.200')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -443,7 +443,7 @@ $('readSource').onclick=read;
 $('flowPages').onclick=e=>e.stopPropagation();
 $('flowPages').onkeydown=e=>e.stopPropagation();
 $('flowPages').oninput=()=>{const v=parseInt($('flowPages').value||'5',10)||5;if(v<1)$('flowPages').value=1;if(v>50)$('flowPages').value=50;};
-$('readFlowByDate').onclick=async()=>{if(busy)return;let range;try{range=FeiHongDates.selected($('flowFrom').value,$('flowTo').value);}catch(e){toast(e.message);return;}const n=Math.max(1,Math.min(50,parseInt($('flowPages').value||'5',10)||5));try{await request({type:'flowDate',from:range.from,to:range.to,flowTab});}catch(err){toast(err.message);return;}toast('已按 '+range.from+' 至 '+range.to+' 筛选，开始读取前 '+n+' 页。');readFlows(n);};
+// v0.9.200：读取日期段入口已隐藏（原站查询区操作不稳定），保留后台命令以备恢复
 $('readFlowPages').onclick=()=>{if(busy)return;const n=Math.max(1,Math.min(50,parseInt($('flowPages').value||'5',10)||5));$('flowPages').value=n;toast('将读取“'+flowTab+'”：扩展会自动把原站切到该分类。');readFlows(n);};
 document.querySelector('nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b&&!busy)view(b.dataset.view);};
 $('flowTools').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.flow){flowTab=b.dataset.flow;toast('已切到“'+flowTab+'”分类，点右上「读取」只读这一类。');}if(b.dataset.person){$('identity').value=b.dataset.person;$('region').value='all';}if(b.dataset.region)$('region').value=b.dataset.region;render();};
