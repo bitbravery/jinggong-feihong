@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.205';
+const COMPONENT_VERSION = '0.9.206';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -211,7 +211,7 @@ async function waitSaved(stage,check){
 // 原站只有一套标签/表单：所有会驱动原站的操作在这里排队，一次只跑一个。
 // 准备成功到提交之间（准备令牌有效期内）挡住其他工作台的操作，避免改动已核对的表单；
 // 同一工作台自己按 准备→提交 串行，不挡（否则工作台刷新后会被自己的旧令牌卡 2 分钟）。
-const PORTAL_OPS=new Set(['statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
+const PORTAL_OPS=new Set(['syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
 let portalBusy='';
 const writeHeld=(type,owner)=>!!preparedWrite&&Date.now()-preparedWrite.at<=120000&&type!=='submit'&&preparedWrite.owner!==owner;
 // 持有令牌的工作台已关闭：令牌作废，不再挡别人
@@ -448,6 +448,16 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      stage('查询和每页条数已就绪，正在核对首页…');
      const first=await readPage('first');return {...first,dateRange:range,scope:'下单时间 '+range.from+' 至 '+range.to+'，所有物流状态'};
    }
+    if(msg.type==='syncFlowStatus'){
+     const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
+     const statuses={};
+     for(let i=0;i<ids.length;i++){
+      const id=ids[i];
+      try{const s=await queryOne(id,{allowEmpty:true});const st=s&&s.total===1?(SourceMapping.normalize(s)[0]||{}).status:'';if(st)statuses[id]=st;}catch{}
+      try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id});}catch{}
+     }
+     return {statuses,total:ids.length,done:Object.keys(statuses).length};
+    }
     if(msg.type==='statusPreflight'){
      const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法读取原站状态。');return found[0];};
      let portal=await readPortal();

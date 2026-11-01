@@ -298,3 +298,8 @@ html{font-size:var(--page-fs,14px)}
 /* v0.9.205：撤回 0.9.203 的“弹窗限高/列表压矮”，恢复原尺寸 */
 .change-summary{max-height:220px;padding:12px;font-size:12px;line-height:2}
 #changeDialog{max-height:none;padding:26px}
+
+/* v0.9.206：主区不再限宽，查询条件行随缩放自适应，不超出页面也不留大片空白 */
+main{max-width:none}
+#queryRow{flex-wrap:wrap!important;row-gap:8px;min-width:0}
+#queryRow>*{min-width:0}
