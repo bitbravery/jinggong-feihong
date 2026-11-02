@@ -21,6 +21,13 @@ assert(/col\.c3\{width:20%\}/.test(live)&&/col\.c4\{width:30%\}/.test(live),'第
 assert(/font-size:19px/.test(live),'打印单元格字号应放大约 1.2 倍（19px）');
 assert(/\.print-form \.pf-table col\.c1\{width:20%\}/.test(css),'预览列宽要与打印一致');
 assert(!/col\.c1\{width:16%\}/.test(css),'预览不应残留旧的 16% 列宽');
+// v1.0.1：打印随纸张自适应；重要提示铺满页面并可分栏
+assert(/@page\{size:auto;margin:15mm 3mm 3mm\}/.test(live),'打印纸张交给打印机，上边留白、下/左/右很小');
+assert(/body\{width:94%;margin:0 auto/.test(live),'打印内容约占纸面 90% 且随纸张宽度自适应');
+assert(!/size:A4 landscape/.test(live),'打印不再写死 A4 横向');
+assert(/\.tips-panel\{max-width:none;width:100%/.test(css),'重要提示要铺满页面');
+assert(/column-width:540px/.test(css),'宽屏重要提示自动分栏');
+assert(/@page\{size:auto;margin:15mm 3mm 3mm\}/.test(css),'浏览器直接打印也用自适应纸张');
 
 // 3) 目标状态：五个点选而不是下拉
 assert(/id="targetStatus" class="status-picker"/.test(html),'目标状态要改成点选容器');
