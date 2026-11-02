@@ -15,22 +15,17 @@ assert(/key:'out-transit'/.test(persp)&&/key:'in-transit',label:other\+'发出\/
   }
 }
 
-// 2) 打印：列宽 20/30/20/30（2:3），整体字号放大约 120%
-assert(/\.pf-table col\.c1\{width:20%\}/.test(live)&&/col\.c2\{width:30%\}/.test(live),'打印列宽应为 20%/30%');
-assert(/col\.c3\{width:20%\}/.test(live)&&/col\.c4\{width:30%\}/.test(live),'第二组列宽也应为 20%/30%');
-assert(/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'打印单元格字号 15px，9×5 一页且填满');
-assert(/\.print-form \.pf-table col\.c1\{width:20%\}/.test(css),'预览列宽要与打印一致');
-assert(!/col\.c1\{width:16%\}/.test(css),'预览不应残留旧的 16% 列宽');
-// v1.0.3：9×5 一页且把页面基本填满（标题 26 / 单元格 15 / 提示 12）
-assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(live),'打印纸张交给打印机，上边留白、下/左/右很小');
-assert(/body\{width:94%;margin:0 auto/.test(live),'打印内容约占纸面 90% 且随纸张宽度自适应');
-assert(!/size:A4 landscape/.test(live),'打印不再写死 A4 横向');
-assert(/\.pf-title\{[^}]*font-size:26px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'打印字号要保证 9×5 一页又尽量填满');
-assert(/\.pf-table\{[^}]*page-break-inside:avoid/.test(live)&&/\.pf-table tr\{page-break-inside:avoid\}/.test(live),'表格不要跨页断开');
-assert(/\.pf-tip\{[^}]*font-size:12px/.test(live),'温馨提示字号也要与页面高度匹配');
+// 2) 打印：按 0.9.184 版式，所有尺寸放大 120%
+assert(/\.pf-table col\.c1\{width:16%\}/.test(live)&&/col\.c2\{width:34%\}/.test(live),'打印列宽应为 16%/34%');
+assert(/col\.c3\{width:16%\}/.test(live)&&/col\.c4\{width:34%\}/.test(live),'第二组列宽也应为 16%/34%');
+assert(/\.pf-title\{[^}]*font-size:31\.2px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:19\.2px/.test(live),'0.9.184 版式放大 120%：标题 31.2px、单元格 19.2px');
+assert(/@page\{size:A4 landscape;margin:10mm\}/.test(live),'打印纸张恢复 A4 横向、10mm 边距');
+assert(/font:14\.4px\/1\.7/.test(live)&&/\.pf-tip\{[^}]*font-size:14\.4px/.test(live),'正文字号也放大 120%');
+assert(/\.print-form \.pf-table col\.c1\{width:16%\}/.test(css),'预览列宽要与打印一致');
+assert(/\.print-form \.pf-table th,\.print-form \.pf-table td\{font-size:19\.2px/.test(css),'预览字号同样放大 120%');
 assert(/\.tips-panel\{max-width:none;width:100%/.test(css),'重要提示要铺满页面');
 assert(/column-width:540px/.test(css),'宽屏重要提示自动分栏');
-assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(css),'浏览器直接打印也用自适应纸张');
+assert(/@page\{size:A4;margin:16mm\}/.test(css),'浏览器直接打印恢复 0.9.184 的 A4 版式');
 
 // 3) 目标状态：五个点选而不是下拉
 assert(/id="targetStatus" class="status-picker"/.test(html),'目标状态要改成点选容器');

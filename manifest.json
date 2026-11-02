@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "京工飞鸿 · 本机接入工作台",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "点击扩展连接当前已登录的学校页面，读取原站结果并通过原站表单办理。无外部服务器。",
   "permissions": [
     "activeTab",
