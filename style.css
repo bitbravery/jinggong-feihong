@@ -138,7 +138,7 @@ body.has-selection-bar #work{padding-bottom:96px}
  #printForm{position:absolute;left:0;right:0;top:0;width:94%;margin:0 auto;padding:0}
  .print-actions{display:none}
  /* v1.0.1：纸张尺寸交给打印机，上边距留白、下/左/右尽量小；内容宽度约占纸面 90% */
- @page{size:auto;margin:15mm 3mm 3mm}
+ @page{size:auto;margin:6mm 3mm 2mm}
 }
 
 /* v0.9.82：预览与打印同列宽 */

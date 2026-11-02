@@ -2,12 +2,12 @@
 
 ## ⬇ Download / 下载
 
-**最新版本：[v1.0.1](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
+**最新版本：[v1.0.2](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
 
-直接下载安装包 → [`jinggong-feihong-v1.0.1.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.1/jinggong-feihong-v1.0.1.zip)
-SHA256：`42537AF10A22827D4D66CDE34D0572E43F0B72D23E1F7C4D8D511FE4C9C0F907`
+直接下载安装包 → [`jinggong-feihong-v1.0.2.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.2/jinggong-feihong-v1.0.2.zip)
+SHA256：以 Release 页为准（v1.0.2 发布时校验）
 
-> 安装包已发布在 [Releases · v1.0.1](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.1)；升级请覆盖原目录并在扩展管理页点卡片刷新。
+> 安装包已发布在 [Releases · v1.0.2](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.2)；升级请覆盖原目录并在扩展管理页点卡片刷新。
 
 > 下载后在 Edge 里「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
 > 只想要源码：`Code → Download ZIP`（不含打包好的发布包，版本需自行确认）。
@@ -28,13 +28,13 @@ SHA256：`42537AF10A22827D4D66CDE34D0572E43F0B72D23E1F7C4D8D511FE4C9C0F907`
 
 ## 安装（推荐：下载 Release 发布包）
 
-1. 打开本仓库右侧 **Releases**（或直接访问 [v1.0.1](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.1)），下载发布包 `jinggong-feihong-v1.0.1.zip`；
+1. 打开本仓库右侧 **Releases**（或直接访问 [v1.0.2](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.2)），下载发布包 `jinggong-feihong-v1.0.2.zip`；
 2. 解压到**固定目录**，例如 `D:\京工飞鸿\`（升级要保持同一路径）；
    - 确认解压后该目录里**直接**能看到 `manifest.json`；如果多套了一层文件夹，加载时选到里面那一层；
    - 目录里不能有以 `_` 开头的文件，否则 Edge 会拒绝加载。
 3. 地址栏输入 `edge://extensions` → 打开「开发人员模式」→「加载解压缩的扩展」→ 选择该目录；
 4. 打开学校门户 `https://ehall.bit.edu.cn`，打开「京工飞鸿两校快件系统」标签，点工具栏红色飞鸿图标；
-5. 左下角显示 `接入版 v1.0.1 · 提交核验版` 即安装成功；
+5. 左下角显示 `接入版 v1.0.2 · 提交核验版` 即安装成功；
 6. 换电脑：旧机器「楼宇与区域 → 导出设置」，新机器「导入设置」。
 
 > 没有 Releases 时也可以走源码：点 **Code → Download ZIP**，解压后按上面第 3 步加载（需自己确认版本号）。

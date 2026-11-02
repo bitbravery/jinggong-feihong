@@ -83,7 +83,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.1')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.2')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -584,7 +584,7 @@ function openPrint(id){
  $('printForm').innerHTML=printFormHtml(o);
  $('printDialog').showModal();
 }
-const PRINT_CSS='@page{size:auto;margin:15mm 3mm 3mm}*{box-sizing:border-box}html,body{width:100%;height:auto}body{width:94%;margin:0 auto;color:#111;font:14.4px/1.7 "Microsoft YaHei",system-ui,sans-serif}.pf-title{text-align:center;font-size:31px;font-weight:600;margin:2px 0 7px}.pf-no{text-align:center;font-size:20px;font-weight:600;letter-spacing:.6px;margin:0 0 17px}.pf-sec{background:#e7ebef;border-left:5px solid #2f6fb3;padding:7px 14px;margin:14px 0 7px;font-size:17px;font-weight:600}.pf-table{width:100%;border-collapse:collapse;margin:0 0 7px;table-layout:fixed}.pf-table col.c1{width:20%}.pf-table col.c2{width:30%}.pf-table col.c3{width:20%}.pf-table col.c4{width:30%}.pf-table th,.pf-table td{border:1px solid #222;padding:11px 14px;font-size:19px;font-weight:400;height:auto}.pf-table th{white-space:nowrap;text-align:center;background:#fafafa}.pf-table td{text-align:left;overflow-wrap:anywhere}.pf-table tr{page-break-inside:avoid}.pf-tip-title{margin:12px 0 5px;font-size:14.4px;font-weight:400}.pf-tip{margin:4px 0;font-size:14.4px;font-weight:400;line-height:1.8}';
+const PRINT_CSS='@page{size:auto;margin:6mm 3mm 2mm}*{box-sizing:border-box}html,body{width:100%;height:auto}body{width:94%;margin:0 auto;color:#111;font:11px/1.35 "Microsoft YaHei",system-ui,sans-serif}.pf-title{text-align:center;font-size:20px;font-weight:600;margin:0 0 2px}.pf-no{text-align:center;font-size:14px;font-weight:600;letter-spacing:.4px;margin:0 0 5px}.pf-sec{background:#e7ebef;border-left:4px solid #2f6fb3;padding:3px 8px;margin:6px 0 3px;font-size:12px;font-weight:600;page-break-inside:avoid}.pf-table{width:100%;border-collapse:collapse;margin:0 0 3px;table-layout:fixed;page-break-inside:avoid}.pf-table col.c1{width:20%}.pf-table col.c2{width:30%}.pf-table col.c3{width:20%}.pf-table col.c4{width:30%}.pf-table th,.pf-table td{border:1px solid #222;padding:3px 6px;font-size:12px;font-weight:400;height:auto;vertical-align:middle}.pf-table th{white-space:nowrap;text-align:center;background:#fafafa}.pf-table td{text-align:left;overflow-wrap:anywhere}.pf-table tr{page-break-inside:avoid}.pf-tip-title{margin:4px 0 1px;font-size:10px;font-weight:600}.pf-tip{margin:1px 0;font-size:10px;font-weight:400;line-height:1.45}';
 function nextExportName(){
  const d=new Date();
  const ymd=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
