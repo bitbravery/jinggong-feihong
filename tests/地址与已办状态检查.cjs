@@ -22,7 +22,8 @@ assert(live.includes('runSyncFlowStatus'),'点击后才回查');
 assert(live.includes("request({type:'syncFlowStatus',ids})"),'点击后才调用回查命令');
 assert(live.includes("statusSource:'query'"),'回查到的行要标来源');
 assert(live.includes("m.type==='statusSync'"),'要显示回查进度');
-assert(w.includes('if(!portal||!portal.service)throw Error'),'回查前先确认业务标签并关掉残留调整单');
+assert(w.includes("ensurePortalPage('query')"),'回查前只要确保「快件查询」标签（其他页面开没开不管）');
+assert(!w.includes('if(!portal||!portal.service)throw Error'),'回查不再要求业务标签，也不再关其他页面');
 assert(w.includes("'syncFlowStatus','statusPreflight'"),'回查要纳入原站串行');
 
 

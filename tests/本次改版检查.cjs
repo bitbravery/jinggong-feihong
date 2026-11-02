@@ -47,7 +47,10 @@ assert(/data-view="tips"/.test(html),'侧栏要有「重要提示」入口');
 assert(!/historyNotice/.test(html),'重要提示不应再嵌在状态修改历史里');
 assert(html.indexOf('id="tips"')<html.indexOf('id="settings"'),'重要提示放在设置之前');
 assert(/值班注意事项/.test(html)&&/常见问题/.test(html),'提示里要有值班注意事项与常见问题');
-assert(/这个工具是怎么来的/.test(html),'提示里要有开发说明');
+assert(/开发者心声/.test(html),'提示里要有开发者心声');
+assert(/mailto:bitbravery@gmail\.com/.test(html),'提示里要有联系邮箱');
+assert(/<h3>主要功能<\/h3>/.test(html),'提示里要有主要功能');
+assert(!/按钮怎么没了/.test(html),'不再显示隐藏按钮的说明');
 assert(/github\.com\/bitbravery\/jinggong-feihong/.test(html),'提示里要有仓库地址');
 
 // 6) 查询进度：查询中 k/n、排队中 m/n，每轮从 1 开始

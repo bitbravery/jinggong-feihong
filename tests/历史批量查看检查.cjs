@@ -17,7 +17,9 @@ assert(/\$\('batchStatusCheck'\)\.onclick=/.test(live),'必须绑定批量查看
 assert(/async function pumpStatus\(\)/.test(live),'要有串行队列');
 assert(/while\(statusQueue\.length\)/.test(live),'必须一条一条顺序查');
 assert(/statusQueue\.shift\(\)/.test(live),'每查完一条才取下一条');
-assert(/request\(\{type:'statusOf',id:row\.id\}\)/.test(live),'要逐条查原站状态');
+assert(/type:'statusOf',id:row\.id/.test(live),'要逐条查原站状态');
+assert(/historyStatusMode==='fast'\?\{type:'statusOfFast'/.test(live),'快速查询走 statusOfFast');
+assert(/name="historyStatusMode"/.test(html)&&/input\[name="historyStatusMode"\]/.test(live),'要有精确/快速二选一');
 assert(/enqueueStatus\(\[row\]\)/.test(live),'单行“查看原站状态”也要入队，不能并发');
 assert(/查询中 '\+sSeq\+'\/'\+historyTotal/.test(live)&&/排队中 '\+sSeq\+'\/'\+historyTotal/.test(live),'行内按钮要显示“查询中 k/n / 排队中 m/n”');
 assert(/historyQueued/.test(live)&&/historyRunning/.test(live),'队列状态要驱动行内按钮');

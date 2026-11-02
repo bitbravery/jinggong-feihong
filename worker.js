@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.222';
+const COMPONENT_VERSION = '0.9.223';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -64,7 +64,7 @@ async function ensurePortalPage(kind,stage,generation){
   if(spec.re.test(active))return true;
   // 顺序按用户要求：先等 0.1 秒 → 关掉残留调整单（目标不是调整单时）→ 点回正确标签
   await pause(100);
-  if(kind!=='form')await closeResidualForm(stage,check);
+  if(kind!=='form'&&kind!=='query')await closeResidualForm(stage,check);
   try{await run({type:'navigate',kind});}catch{}
   await pause(120);
  }
@@ -403,7 +403,7 @@ async function waitSaved(stage,check){
 // 原站只有一套标签/表单：所有会驱动原站的操作在这里排队，一次只跑一个。
 // 准备成功到提交之间（准备令牌有效期内）挡住其他工作台的操作，避免改动已核对的表单；
 // 同一工作台自己按 准备→提交 串行，不挡（否则工作台刷新后会被自己的旧令牌卡 2 分钟）。
-const PORTAL_OPS=new Set(['openStandardPages','endRead','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
+const PORTAL_OPS=new Set(['openStandardPages','endRead','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','statusOfFast','openFlow']);
 let portalBusy='';
 const writeHeld=(type,owner)=>!!preparedWrite&&Date.now()-preparedWrite.at<=120000&&type!=='submit'&&preparedWrite.owner!==owner;
 // 持有令牌的工作台已关闭：令牌作废，不再挡别人
@@ -659,38 +659,44 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    }
     if(msg.type==='syncFlowStatus'){
  const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
- // 回查前先关掉“物流状态调整单”等没用的页面，避免影响查询
- {const out=await run({type:'portalState'});const portal=out.filter(r=>Array.isArray(r.tabs))[0];
-  if(!portal||!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签，无法回查。');
-  for(let i=0;i<3&&portal.forms>0;i++){try{await run({type:'closeFormTab'});}catch{}await pause(120);const p2=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(p2)portal=p2;}
- }
- const statuses={};
+ const statuses={},failures=[];
  try{
+  // 只要原站有「快件查询」就能查；其他页面开没开、关没关都不管
   await navigate('query');
   await ensurePortalPage('query');
   try{await clearQueryTags();}catch{}
   for(let i=0;i<ids.length;i++){
    const id=ids[i];
-   try{
-    await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成');
-    const {token}=await waitSource({type:'queryOrder',id},'queryRequested','原站未能发起单号查询');
-    const end=Date.now()+60000;
-    while(Date.now()<end){
-     const out=await run({type:'snapshot',kind:'query'});
-     if(out.some(r=>r.timeout)){await pause(250);continue;}
-     const error=out.find(r=>r.error);if(error)throw Error(error.error);
-     const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);
-     if(results.length===1){const s=results[0];if(s.total===1){const st=(SourceMapping.normalize(s)[0]||{}).status;if(st)statuses[id]=st;}break;}
-     await pause(200);
-    }
-   }catch{}
-   try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||''});}catch{}
+   let ok=false,lastErr='';
+   for(let attempt=0;attempt<2&&!ok;attempt++){
+    try{
+     if(attempt)await pause(600);
+     await waitSource({type:'queryField',id},'fieldSelected','原站单号查询字段未加载完成',undefined,undefined,60000,undefined,()=>ensurePortalPage('query'));
+     const {token}=await waitSource({type:'queryOrder',id},'queryRequested','原站未能发起单号查询',undefined,undefined,60000,undefined,()=>ensurePortalPage('query'));
+     const end=Date.now()+60000;
+     while(Date.now()<end){
+      const out=await run({type:'snapshot',kind:'query'});
+      if(out.some(r=>r.timeout)){await pause(250);continue;}
+      const error=out.find(r=>r.error);if(error)throw Error(error.error);
+      const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);
+      if(results.length===1){
+       const s=results[0];
+       if(s.total===1){const st=(SourceMapping.normalize(s)[0]||{}).status;if(st){statuses[id]=st;ok=true;}else lastErr='原站没有状态';}
+       else lastErr='原站命中 '+(s.total??'?')+' 条';
+       break;
+      }
+      await pause(200);
+     }
+    }catch(e){lastErr=e.message;}
+   }
+   if(!ok)failures.push({id,reason:lastErr||'未查到'});
+   try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||'',ok}).catch(()=>{});}catch{}
   }
  }finally{
   // 批量全部查完，最后统一“先点红色错号、再点关闭查询”
   try{await closeQueryPanel();}catch{}
  }
- return {statuses,total:ids.length,done:Object.keys(statuses).length};
+ return {statuses,total:ids.length,done:Object.keys(statuses).length,failures};
 }
 if(msg.type==='statusPreflight'){
      const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法读取原站状态。');return found[0];};
@@ -989,6 +995,14 @@ mark('portal');
           if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效单号');
 const order=await formOrder(msg.id);
 return {id:order.id,status:order.status,order};
+    }
+   if(msg.type==='statusOfFast'){
+          if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效回查单号');
+const s=await queryOne(msg.id,{allowEmpty:true});
+const order=s&&s.total===1?SourceMapping.normalize(s)[0]:null;
+const st=order&&order.status;
+if(!st)throw Error('原站按单号没查到该单（可能尚未生效或被查询条件限制）。');
+return {id:msg.id,status:st,via:'query'};
     }
 if(msg.type==='diagnose'){
     const portalOut=await run({type:'portalState'});

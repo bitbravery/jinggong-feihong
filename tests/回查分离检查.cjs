@@ -12,15 +12,18 @@ assert(live.includes('data-sync'),'流程标签行要有“实际状态回查”
 assert(!live.includes("'抄送给我'"),'标签行不再有抄送给我');
 assert(live.includes('async function runSyncFlowStatus()'),'点击才回查');
 
-// 3) 回查前先确认业务标签、关掉残留调整单
+// 3) 回查前只要「快件查询」，不要求业务标签、不关其他页面（用户 2026-11-02 定的）
 const sync=w.slice(w.indexOf("msg.type==='syncFlowStatus'"),w.indexOf("msg.type==='statusPreflight'"));
-assert(sync.includes('closeFormTab'),'回查前要关掉残留的物流状态调整单');
-assert(sync.includes('没有打开“京工飞鸿两校快件系统”'),'业务标签没开要提示');
+assert(sync.includes("ensurePortalPage('query')"),'回查前确保「快件查询」标签在前台');
+assert(!sync.includes('closeFormTab'),'回查不再关其他页面');
+assert(!sync.includes('没有打开“京工飞鸿两校快件系统”'),'不再要求业务标签');
 
-// 4) 历史“查看原站状态”保持原方式（打开调整单核对）
-const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='diagnose'"));
-assert(so.includes('formOrder(msg.id)'),'历史状态回查仍走调整单');
-assert(!so.includes('queryOne(msg.id'),'不再走快件查询');
+// 4) 历史「查看原站状态」两种方式：精确=调整单；快速=快件查询
+const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='statusOfFast'"));
+assert(so.includes('formOrder(msg.id)'),'精确查询仍走调整单');
+assert(!so.includes('queryOne(msg.id'),'精确查询不走快件查询');
+const fast=w.slice(w.indexOf("msg.type==='statusOfFast'"),w.indexOf("msg.type==='diagnose'"));
+assert(fast.includes('queryOne(msg.id'),'快速查询按单号走快件查询');
 
 
 // 批量查完只关一次查询（不是每单都关）

@@ -14,7 +14,7 @@ function setStage(t){stageText=t;renderStage();}
 function tagText(){return batchTotal>1?(batchIndex+'/'+batchTotal+' '):'';}
 function setOrderState(id,text,kind){try{const el=document.querySelector('.cs-state[data-state="'+CSS.escape(String(id))+'"]');if(!el)return;el.textContent=text;el.dataset.kind=kind||'';}catch{}}
 function setOrderNote(id,note){try{const row=document.querySelector('.cs-row[data-row="'+CSS.escape(String(id))+'"]');if(row&&note)row.title=note;}catch{}}
-if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
+if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';const bar=$('bulkBar');if(bar){bar.max=m.total||1;bar.value=m.done||0;}const cnt=$('bulkCount');if(cnt)cnt.textContent='已回查 '+m.done+'/'+m.total+' 单';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
 let readProgress={rows:0,total:null,page:0,pages:null,percent:null,started:0,note:''};
 function drawReadProgress(){const p=readProgress,seconds=p.started?((performance.now()-p.started)/1000).toFixed(1):'0.0';$('bulkText').textContent=`已查询 ${p.rows}/${p.total??'—'} 行，第 ${p.page}/${p.pages??'—'} 页，用时 ${seconds} 秒，进度 ${p.percent===null?'待计算':p.percent+'%'}${p.note?' · '+p.note:''}`;}
 let localPage=1, pendingCampus=null, bulkCancelled=false;
@@ -66,7 +66,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.222')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.223')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -110,7 +110,7 @@ function render(listOnly=false){
  $('connection').textContent=lastReadError?('读取未完成：'+(s?.bulk&&!s.complete?'仅已读 '+s.rows.length+'/'+(s.total??'—')+' 行 · ':'')+lastReadError):s?`${s.bulk?(s.complete?'近一个月读取完成':'未读完，仅显示已读部分'):'当前页读取完成'} · ${s.rows.length}/${s.total??'—'} 行${s.bulk?' · '+s.pagesRead+'/'+s.pageCount+' 页':''} · ${formatTime(new Date(s.readAt))}${s.dateRange?' · '+s.dateRange.from+' 至 '+s.dateRange.to:''}${duplicateIds?' · '+duplicateIds+' 个重复单号（禁改）':''}`:'尚未读取';
  if(!listOnly){
  $('overview').innerHTML=CampusPerspective.columns(campus).map(c=>`<button aria-pressed="${activeColumns.has(c.key)}" class="status-tab ${activeColumns.has(c.key)?'active':''}" data-column="${c.key}"><span>${E(c.label)}</span><b>${orders().filter(o=>CampusPerspective.matchesColumn(o,campus,c,mappings)).length}</b></button>`).join('');
- $('flowTabs').innerHTML=['待办','已办'].map(t=>`<button class="button ${flowTab===t?'primary':''}" data-flow="${t}">${t}</button>`).join('')+`<button class="button flow-sync-tab" data-sync="1">实际状态回查</button>`;
+ $('flowTabs').innerHTML=['待办','已办'].map(t=>`<button class="button ${flowTab===t?'primary':''}" data-flow="${t}">${t}</button>`).join('')+(flowTab==='已办'?`<button class="button flow-sync-tab" data-sync="1">实际状态回查</button>`:'');
  $('personTabs').innerHTML=['all','老师','学生','京工飞鸿','身份待确认','疑似代老师下单'].map(t=>`<button class="button ${$('identity').value===t?'primary':''}" data-person="${t}">${t==='all'?'全部下单':t==='疑似代老师下单'?t:t+'下单'}</button>`).join('');
  $('regionTabs').hidden=!['老师','疑似代老师下单'].includes($('identity').value)||campus!=='良乡';$('regionTabs').innerHTML=['all','北校区','东校区','南校区','东南校区','区域待分配'].map(t=>`<button class="button" data-region="${t}">${t==='all'?'全部区域':t}</button>`).join('');
  $('listTitle').textContent=flow?campus+'流程办理 · '+flowTab:CampusPerspective.columns(campus).find(c=>c.key===activeColumn).label;
@@ -455,17 +455,25 @@ $('readFlowPages').onclick=()=>{if(busy)return;const n=Math.max(1,Math.min(50,pa
 document.querySelector('nav').onclick=e=>{const b=e.target.closest('[data-view]');if(b&&!busy)view(b.dataset.view);};
 async function runSyncFlowStatus(){
  if(busy||statusBusy)return;
+ if(flowTab!=='已办'){toast('“实际状态回查”只在「已办」页可用；待办状态原站是准确的，不需要回查。');return;}
  const rows=records.flow.filter(o=>o.flow==='已办');
  const ids=[...new Set(rows.map(o=>o.id).filter(id=>/^JGKD\d+$/.test(id)))];
  if(!ids.length){toast('已办列表还没有数据，请先在「已办」里读取流程。');return;}
  busy=true;bulkCancelled=false;lastReadError='';
- $('bulkProgress').hidden=false;$('bulkBar').removeAttribute('value');$('bulkText').textContent='正在到「快件查询」回查实际状态 0/'+ids.length+'…';drawReadProgress();
+ $('bulkProgress').hidden=false;$('bulkBar').max=ids.length;$('bulkBar').value=0;
+ $('bulkText').textContent='正在到「快件查询」回查实际状态 0/'+ids.length+'…';$('bulkCount').textContent='已回查 0/'+ids.length+' 单';drawReadProgress();
  try{
   const synced=await request({type:'syncFlowStatus',ids});
-  let n=0;if(synced&&synced.statuses){records.flow=records.flow.map(o=>o.flow==='已办'&&synced.statuses[o.id]?(n++,{...o,status:synced.statuses[o.id],statusSource:'query'}):o);}
-  render();toast(n?('已回查 '+n+'/'+ids.length+' 单实际状态。'):'没有回查到状态，请确认原站可查询。',5000);
- }catch(err){toast('实际状态回查失败：'+err.message,8000);}
- finally{busy=false;$('bulkProgress').hidden=true;}
+  let n=0;const got=(synced&&synced.statuses)||{};
+  records.flow=records.flow.map(o=>o.flow==='已办'&&got[o.id]?(n++,{...o,status:got[o.id],statusSource:'query'}):o);
+  $('bulkBar').value=ids.length;
+  const fail=(synced&&synced.failures)||[],failIds=fail.map(f=>f.id);
+  $('bulkText').textContent='实际状态回查完成：'+n+'/'+ids.length+' 单'+(failIds.length?'；没查到：'+failIds.slice(0,6).join('、')+(failIds.length>6?' 等':'')+'（可稍后再点一次）':'');
+  $('bulkCount').textContent='已回查 '+n+'/'+ids.length+' 单';
+  render();
+  toast(n?('已回查 '+n+'/'+ids.length+' 单实际状态'+(failIds.length?'，'+failIds.length+' 单没查到（'+failIds.slice(0,3).join('、')+(failIds.length>3?' 等':'')+'）':'')+'。'):'没有回查到状态，请确认原站「快件查询」能正常按单号查到。',failIds.length?12000:6000);
+ }catch(err){toast('实际状态回查失败：'+err.message,10000);}
+ finally{busy=false;setTimeout(()=>{if(!busy)$('bulkProgress').hidden=true;},5000);}
 }
 $('flowTools').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.sync!==undefined){runSyncFlowStatus();return;}if(b.dataset.flow){flowTab=b.dataset.flow;toast('已切到“'+flowTab+'”分类，点右上「读取」只读这一类。');}if(b.dataset.person){$('identity').value=b.dataset.person;$('region').value='all';}if(b.dataset.region)$('region').value=b.dataset.region;render();};
 $('overview').onclick=e=>{const b=e.target.closest('[data-column]');if(b){activeColumns=CampusPerspective.toggleColumns(activeColumns,b.dataset.column);activeColumn=[...activeColumns][0];localPage=1;$('direction').value='all';selected.clear();render();}};
@@ -618,6 +626,7 @@ $('recheckUnknown').onclick=()=>{
  enqueueStatus(rows);toast('已把 '+rows.length+' 条结果不明的记录加入查看原站状态队列。');
 };
 const statusQueue=[];let statusBusy=false,statusDone=0,statusTotal=0;
+let historyStatusMode='exact';
 function historyDisplayRows(){
  const all=records.query.concat(records.flow);
  return FeiHongAudit.filter(audit,historyFilter(),id=>all.find(x=>x.id===id));
@@ -658,7 +667,7 @@ async function pumpStatus(){
    while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
    statusButtonLabel();
    try{
-    const r=await request({type:'statusOf',id:row.id});
+    const r=await request(historyStatusMode==='fast'?{type:'statusOfFast',id:row.id}:{type:'statusOf',id:row.id});
     row.currentStatus=r.status;row.checkedAt=formatTime(new Date());
     collapsedDays.delete(FeiHongAudit.dayKey(row));
     toast('原站当前状态：'+r.status+'（'+formatTime(new Date())+'）',1200);
@@ -682,6 +691,7 @@ $('batchStatusCheck').onclick=()=>{
  if(!rows.length){toast('当前列表没有可查询的记录。');return;}
  enqueueStatus(rows);
 };
+document.querySelectorAll('input[name="historyStatusMode"]').forEach(r=>r.onchange=()=>{if(r.checked)historyStatusMode=r.value;});
 
 $('historyRows').onclick=async e=>{
  const day=e.target.dataset.day;

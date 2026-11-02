@@ -241,15 +241,17 @@ html{font-size:var(--page-fs,14px)}
 /* v0.9.186：重要提示独立成页 */
 .tips-panel{max-width:980px}
 .tips-panel h2{margin:0 0 6px}
-.tips-body{padding:2px 2px 4px;font-size:13px;line-height:1.9;color:var(--ink)}
-.tips-body h3{margin:18px 0 6px;font-size:14px;color:#8a6413}
+.tips-body{padding:2px 2px 4px;font-size:14px;line-height:1.85;color:var(--ink);overflow-wrap:anywhere}
+.tips-body h3{margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid #e4ebe7;font-size:16px;color:#245747}
 .tips-body ol{padding-left:22px;margin:6px 0}
-.tips-body li{margin:5px 0}
+.tips-body li{margin:8px 0}
 .tips-body dl{margin:6px 0}
-.tips-body dt{font-weight:600;margin-top:10px}
-.tips-body dd{margin:3px 0 0;color:#4a5a54}
+.tips-body dt{font-weight:600;margin-top:16px;color:#24473c}
+.tips-body dd{margin:4px 0 0;color:#4a5a54}
 .tips-body code{background:#f2ece0;padding:1px 5px;border-radius:4px;font-size:12px}
 .tips-body a{color:var(--green)}
+.tips-contact{margin-top:16px;padding:12px 16px;background:#f1f7f3;border-left:3px solid #9bc4af;border-radius:4px 8px 8px 4px}
+.tips-contact p{margin:3px 0}
 
 .status-picker{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;padding:0;border:1px solid #cfe0d6;border-radius:10px;overflow:hidden;background:#eaf4ef}
 .status-option{position:relative;display:flex;align-items:center;justify-content:center;padding:13px 6px;background:#eaf4ef;color:#1f4d3f;font-size:14px;line-height:1.2;cursor:pointer;border-right:1px solid #d3e5da;transition:background .12s,color .12s}
@@ -352,3 +354,13 @@ main{max-width:none}
 #openStandard{display:block;width:100%;margin-top:10px;padding:9px 8px;font-size:12px;line-height:1.35;background:transparent;border:1px solid #67887b;color:#e6f1b7;border-radius:6px;text-align:center;white-space:normal}
 #openStandard:hover:not(:disabled){background:#1d5446;border-color:#8fb8a6}
 #openStandard:disabled{opacity:.6;cursor:default}
+
+
+/* v0.9.223：侧栏关键提醒 + 历史查询方式选择 */
+.sidebar-notes{margin:14px 0 0;padding:10px 12px;border:1px solid #2f5a4c;border-radius:8px;background:#0f352c;color:#cfe2d8;font-size:10px;line-height:1.65}
+.sidebar-notes b{display:block;color:#e6f1b7;font-size:11px;margin-bottom:5px}
+.sidebar-notes p{margin:0 0 6px}
+.sidebar-notes p:last-child{margin:0}
+.sidebar-icon-only .sidebar-notes{display:none}
+.history-status-mode{display:inline-flex;align-items:center;gap:10px;font-size:12px;color:#4a5d55;margin:0 4px}
+.history-status-mode label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
