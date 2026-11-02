@@ -5,9 +5,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
 const read=f=>fs.readFileSync(__dirname+'/../'+f,'utf8');
 const html=read('index.html'),live=read('live.js'),worker=read('worker.js'),source=read('source.js'),css=read('style.css');
 
-// 1) 侧栏：删掉校区提示行，新增整行按钮
+// 1) 侧栏：删掉校区提示行，新增整行按钮（v0.9.220 起功能暂缓，按钮 hidden，后台代码保留）
 assert(html.includes('id="openStandard"'),'侧栏要有“打开原站标准页面”按钮');
 assert(html.includes('打开原站标准页面'),'按钮文字应是“打开原站标准页面”');
+assert(/<button id="openStandard"[^>]*\bhidden\b/.test(html),'功能暂缓：按钮要先隐藏');
 assert(!html.includes('campusHint'),'旧的“当前：…点击另一校区后确认”提示行要删掉');
 assert(/#openStandard\{[^}]*width:100%/.test(css),'按钮要占整行');
 assert(!live.includes('campusHint'),'live.js 不再更新已删除的提示行');
