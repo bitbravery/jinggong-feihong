@@ -5,7 +5,7 @@
 **最新版本：[v1.0.8](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
 
 直接下载安装包 → [`jinggong-feihong-v1.0.8.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.8/jinggong-feihong-v1.0.8.zip)
-SHA256：以 Release 页为准（v1.0.8 发布时校验）
+SHA256：`F6310C2E3B5401DEB75A1EEA06DEFF84C9BA494BD0523AD043A91E7406B4BE1B`
 
 > 安装包已发布在 [Releases · v1.0.8](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.8)；升级请覆盖原目录并在扩展管理页点卡片刷新。
 
