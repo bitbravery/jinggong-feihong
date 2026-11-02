@@ -1,5 +1,5 @@
 // 手写 OOXML 工作簿：所有单元格都是文本，不含公式。
-// 两个工作表：①「发车清单」按 A4 横向一页宽排版（16 列，宽度按真实内容预设）②「完整数据」保留全部 19 列。
+// 只导出一张「发车清单」：A4 横向一页宽排版（16 列，宽度按真实内容预设）。
 (function(root){
  const enc=new TextEncoder();
  const xml=s=>String(s??'').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
@@ -10,8 +10,9 @@
  const R='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
  const colName=n=>{let s='';n+=1;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
 
- // 发车清单：按 1385 条真实数据量过宽度（序号/单号/时间/状态/寄件人三项/寄件地址三项/物品/收件人两项/收件地址三项）
- const PRINT_WIDTHS=[5,18,11,9,11,11,15,9,15,13,24,11,15,9,17,13];
+ // 发车清单：按真实数据量过宽度（序号/单号/时间/状态/寄件人三项/寄件地址三项/物品/收件人两项/收件地址三项）
+ // v1.0.0：用户反馈“物品信息列偏宽、总宽不变”——物品 24→18，多出的宽度分给寄件/收件楼宇地址
+ const PRINT_WIDTHS=[5,18,11,9,11,11,15,9,18,13,18,11,15,9,20,13];
  const PRINT_COLS=PRINT_WIDTHS.length;
 
  function sheetXml(rows,{widths=null,print=false}={}){
@@ -44,22 +45,18 @@
  function workbook(rows){
   const header=rows[0]||[],body=rows.slice(1);
   const printRows=[header.slice(0,PRINT_COLS),...body.map(r=>r.slice(0,PRINT_COLS))];
-  const fullRows=[header,...body];
   return zip({
    '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
     +'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
     +'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
-    +'<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
     +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
    '_rels/.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-   'xl/workbook.xml':`<workbook xmlns="${NS}" xmlns:r="${R}"><sheets><sheet name="发车清单" sheetId="1" r:id="rId1"/><sheet name="完整数据" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'发车清单'!$1:$1</definedName></definedNames></workbook>`,
+   'xl/workbook.xml':`<workbook xmlns="${NS}" xmlns:r="${R}"><sheets><sheet name="发车清单" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">'发车清单'!$1:$1</definedName></definedNames></workbook>`,
    'xl/_rels/workbook.xml.rels':'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-    +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>'
-    +'<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    +'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
    'xl/styles.xml':STYLES,
-   'xl/worksheets/sheet1.xml':sheetXml(printRows,{widths:PRINT_WIDTHS,print:true}),
-   'xl/worksheets/sheet2.xml':sheetXml(fullRows,{widths:null,print:false})
+   'xl/worksheets/sheet1.xml':sheetXml(printRows,{widths:PRINT_WIDTHS,print:true})
   });
  }
  function simpleWorkbook(rows,title="状态修改历史"){
