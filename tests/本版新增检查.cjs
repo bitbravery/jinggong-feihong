@@ -41,6 +41,7 @@ assert(/导出 Excel/.test(html),'主要功能里要有导出 Excel 说明');
 assert(/A4 横向预设列宽/.test(html),'导出 Excel 要说明 A4 排版');
 assert(/以上为部分主要功能列举，当然还有一些其他功能可以探索使用/.test(html),'主要功能最后一句');
 assert(html.includes('成百上千个版本')&&html.includes('无偿提供')&&html.includes('半开源'),'开发者心声要说明开发不易、无偿提供与半开源');
+assert(html.includes('复写 9×5 英寸')&&html.includes('实际大小'),'重要提示要写打印设置（9×5、缩放默认/实际大小）');
 // 6) 顶部说明按页面区分；只有快件查询/流程显示读取状态
 assert(html.includes('id="pageHint"'),'顶部说明要有可变的 pageHint');
 assert(live.includes('const HINTS={flow:'),'每个页面要有自己的说明文字');
