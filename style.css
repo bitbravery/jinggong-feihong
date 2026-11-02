@@ -135,10 +135,10 @@ body.has-selection-bar #work{padding-bottom:96px}
 @media print{
  body *{visibility:hidden}
  #printForm,#printForm *{visibility:visible}
- #printForm{position:absolute;left:0;top:0;width:100%;padding:0}
+ #printForm{position:absolute;left:0;right:0;top:0;width:93%;margin:0 auto;padding:0}
  .print-actions{display:none}
  /* v1.0.1：纸张尺寸交给打印机，上边距留白、下/左/右尽量小；内容宽度约占纸面 90% */
- @page{size:A4;margin:16mm}
+ @page{size:A4;margin:10mm 5mm}
 }
 
 /* v0.9.82：预览与打印同列宽 */
