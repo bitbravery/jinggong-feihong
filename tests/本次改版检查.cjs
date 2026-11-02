@@ -16,12 +16,12 @@ assert(/key:'out-transit'/.test(persp)&&/key:'in-transit',label:other\+'发出\/
 }
 
 // 2) 打印：按复写纸 9×5 排版，内容约占纸面 90%（字体沿用之前好看的一版）
-assert(/\.pf-table col\.c1\{width:16%\}/.test(live)&&/col\.c2\{width:24%\}/.test(live),'打印左右两组宽度为 40%/60%，组内 16/24');
-assert(/col\.c3\{width:24%\}/.test(live)&&/col\.c4\{width:36%\}/.test(live),'右侧组宽 60%，组内 24/36');
-assert(/\.pf-title\{[^}]*font-size:15px/.test(live)&&/\.pf-no\{[^}]*font-size:15px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'标题/单号/表格统一 15px');
+assert(/\.pf-table col\.c1\{width:20%\}/.test(live)&&/col\.c2\{width:20%\}/.test(live),'两列标签各 20%，左组 40%');
+assert(/col\.c3\{width:20%\}/.test(live)&&/col\.c4\{width:40%\}/.test(live),'右侧标签 20%，右组 60%');
+assert(/\.pf-title\{[^}]*font-size:20px/.test(live)&&/\.pf-no\{[^}]*font-size:20px/.test(live),'标题/单号 20px，稍大于表格');
 assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(live),'纸张自适应，上下左右留白 6/3/2mm');assert(/body\{width:80%;margin:0 auto/.test(live),'内容宽度约占纸面 80%');
 assert(/\.pf-tip\{[^}]*font-size:12px/.test(live),'温馨提示 12px');
-assert(/\.print-form \.pf-table col\.c1\{width:16%\}/.test(css),'预览列宽要与打印一致');
+assert(/\.print-form \.pf-table col\.c1\{width:20%\}/.test(css),'预览列宽要与打印一致');
 assert(/\.print-form \.pf-table th,\.print-form \.pf-table td\{font-size:15px/.test(css),'预览字号要与打印一致');
 assert(/\.tips-panel\{max-width:none;width:100%/.test(css),'重要提示要铺满页面');
 assert(/column-width:540px/.test(css),'宽屏重要提示自动分栏');

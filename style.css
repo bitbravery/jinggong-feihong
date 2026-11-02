@@ -122,9 +122,10 @@ body.has-selection-bar #work{padding-bottom:96px}
 /* v0.9.75：扩展内打印申请单 */
 .print-dialog{width:880px;max-width:96vw;padding:0;border:0;border-radius:12px}
 .print-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
+.print-hint{margin:0;padding:8px 14px;font-size:12px;color:#5f6f69;background:#f6faf8;border-bottom:1px solid var(--line)}
 .print-form{padding:24px 30px;background:#fff;color:#111;font-size:12px}
-.pf-title{text-align:center;font-size:15px;margin:0 0 2px}
-.pf-no{text-align:center;color:#333;margin:0 0 6px;font-size:15px;letter-spacing:.2px}
+.pf-title{text-align:center;font-size:20px;width:70%;margin:0 auto 2px}
+.pf-no{text-align:center;color:#333;margin:0 auto 6px;font-size:20px;letter-spacing:.2px;width:70%}
 .pf-sec{background:#e9edf2;border-left:4px solid #2f6fb3;padding:5px 9px;margin:7px 0 4px;font-size:15px;font-weight:600}
 .pf-table{width:100%;border-collapse:collapse;margin-bottom:7.2px}
 .pf-table th,.pf-table td{border:1px solid #333;padding:4px 8px;font-weight:400;text-align:left}
@@ -142,7 +143,7 @@ body.has-selection-bar #work{padding-bottom:96px}
 }
 
 /* v0.9.82：预览与打印同列宽 */
-.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:16%}.print-form .pf-table col.c2{width:24%}.print-form .pf-table col.c3{width:24%}.print-form .pf-table col.c4{width:36%}
+.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:20%}.print-form .pf-table col.c2{width:20%}.print-form .pf-table col.c3{width:20%}.print-form .pf-table col.c4{width:40%}
 
 /* v0.9.83：读取区不裁切、日期列收窄；预览表格字号 */
 .header-actions{max-width:none}
