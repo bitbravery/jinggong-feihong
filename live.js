@@ -66,7 +66,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.224')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.0')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -126,7 +126,7 @@ function emptyRow(){
  if(region!=='all')return '<tr><td colspan="8" class="empty">寄件区域按「楼宇 → 区域」对照表筛选：'+(count?('已配置 '+count+' 个楼宇，但该区域目前没有分配楼宇'):'尚未配置任何楼宇')+'。请到「楼宇与区域」配置后再筛。</td></tr>';
  return '<tr><td colspan="8" class="empty">暂无已读取的匹配快件。请先读取原站对应列表。</td></tr>';
 }
-function view(v){const sub=document.querySelector('.header-subtitle');if(sub)sub.hidden=(v==='tips');if(v==='history'){try{const rows=document.getElementById('historyRows');if(rows)rows.scrollTop=0;const sec=document.getElementById('history');if(sec)sec.scrollTop=0;}catch{}}const bar=$('selectionBar');if(bar)bar.hidden=true;if(document.body&&document.body.classList)document.body.classList.remove('has-selection-bar');if(!busy)$('bulkProgress').hidden=true;currentView=v;localPage=1;selected.clear();activeColumn='all';activeColumns=new Set(['all']);$('search').value='';for(const id of ['direction','identity','region'])$(id).value='all';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));$('settings').hidden=v!=='settings';$('history').hidden=v!=='history';$('tips').hidden=v!=='tips';$('work').hidden=!['orders','flow'].includes(v);const work=['orders','flow'].includes(v),query=v==='orders';$('readSource').hidden=!work;$('readFlows').hidden=true;$('diagnose').hidden=v!=='flow';$('readSource').textContent='读取当前页';$('flowPagesWrap').hidden=v!=='flow';$('readRecent').hidden=v==='flow'||!work;$('readAll').hidden=v==='flow'||!work;document.querySelector('.read-range').hidden=v==='flow'||!work;if($('statusRow'))$('statusRow').hidden=(v==='flow');$('pageTitle').textContent={flow:'流程办理',orders:'快件查询及状态调整',settings:'楼宇与区域',history:'状态修改历史',tips:'重要提示'}[v];if(v==='settings')renderMappings();else if(v==='history')renderHistory();else render();}
+function view(v){const sub=document.querySelector('.header-subtitle');if(sub)sub.hidden=false;const HINTS={flow:'待办/已办流程读取与批量通过、退回。',orders:'查询、分类、改状态，在这里一次完成。',settings:'维护寄件楼宇 → 校区区域对照；只影响工作台筛选，不改原站。',history:'本地保存最近一个月的改动记录；可核对原站状态或改回。',tips:'值班注意事项、主要功能、改状态要点和常见问题。'};const hintEl=document.getElementById('pageHint');if(hintEl)hintEl.textContent=HINTS[v]||'';const connEl=document.getElementById('connection');if(connEl)connEl.hidden=!['orders','flow'].includes(v);if(v==='history'){try{const rows=document.getElementById('historyRows');if(rows)rows.scrollTop=0;const sec=document.getElementById('history');if(sec)sec.scrollTop=0;}catch{}}const bar=$('selectionBar');if(bar)bar.hidden=true;if(document.body&&document.body.classList)document.body.classList.remove('has-selection-bar');if(!busy)$('bulkProgress').hidden=true;currentView=v;localPage=1;selected.clear();activeColumn='all';activeColumns=new Set(['all']);$('search').value='';for(const id of ['direction','identity','region'])$(id).value='all';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));$('settings').hidden=v!=='settings';$('history').hidden=v!=='history';$('tips').hidden=v!=='tips';$('work').hidden=!['orders','flow'].includes(v);const work=['orders','flow'].includes(v),query=v==='orders';$('readSource').hidden=!work;$('readFlows').hidden=true;$('diagnose').hidden=v!=='flow';$('readSource').textContent='读取当前页';$('flowPagesWrap').hidden=v!=='flow';$('readRecent').hidden=v==='flow'||!work;$('readAll').hidden=v==='flow'||!work;document.querySelector('.read-range').hidden=v==='flow'||!work;if($('statusRow'))$('statusRow').hidden=(v==='flow');$('pageTitle').textContent={flow:'流程办理',orders:'快件查询及状态调整',settings:'楼宇与区域',history:'状态修改历史',tips:'重要提示'}[v];if(v==='settings')renderMappings();else if(v==='history')renderHistory();else render();}
 function openChange(ids){pending=orders().filter(o=>ids.includes(o.id)&&!o.duplicateOrder);if(!pending.length)return;
  const pendingFlow=pending.filter(o=>o.flow==='待办');
  if(pendingFlow.length){toast('选中的 '+pendingFlow.length+' 单还在“待办”：请先在原站「批量处理 → 通过」，变成已办并进入良乡申请寄件后，才能改物流状态。');return;}writePhase='idle';changeCancelled=false;writeStarted=performance.now();if(!stageTimer)stageTimer=setInterval(renderStage,500);setStage('尚未提交，可随时取消。');$('cancelChange').textContent='取消';$('cancelChange').disabled=false;$('closeChange').disabled=false;$('changeSummary').innerHTML=pending.map(o=>'<div class="cs-row" data-row="'+E(o.id)+'">'+E(o.id)+' · '+E(o.sender)+' → '+E(o.receiver)+' · '+E(o.status)+'<span class="cs-state" data-state="'+E(o.id)+'">待处理</span></div>').join('');const pick=$('targetStatus');pick.dataset.value='';pick.dataset.selected='0';pick.style.setProperty('--i','0');pick.querySelectorAll('input[type=radio]').forEach(r=>{r.checked=false;});$('changeReason').value='';$('changeForm').querySelector('button[type="submit"]').disabled=!FeiHongWritePolicy.allowed(pending);$('batchCount').textContent=pending.length;$('changeDialog').showModal();}
@@ -660,13 +660,20 @@ async function pumpStatus(){
  const btn=$('batchStatusCheck');if(btn)btn.disabled=true;
  try{
   if(historyStatusMode==='fast'){
+   // 改状态/改回/读取进行中时不插队：原站一次只做一件事。
+   while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
    // 快速查询：整批交给后台一次打开「快件查询」逐单查，最后统一关查询（和已办实际状态回查同一条路）
    const items=statusQueue.slice();
    const ids=[...new Set(items.map(x=>x.row.id).filter(id=>/^JGKD\d+$/.test(id)))];
    if(!ids.length){statusQueue.length=0;return;}
    if(btn)btn.textContent='快速查询中 0/'+ids.length;
-   const r=await request({type:'syncFlowStatus',ids});
-   const got=(r&&r.statuses)||{},fails=(r&&r.failures)||[];
+   const got={},fails=[];
+   for(let i=0;i<ids.length;i+=200){
+    if(btn)btn.textContent='快速查询中 '+Math.min(i+200,ids.length)+'/'+ids.length;
+    const r=await request({type:'syncFlowStatus',ids:ids.slice(i,i+200)});
+    Object.assign(got,(r&&r.statuses)||{});
+    if(r&&Array.isArray(r.failures))fails.push(...r.failures);
+   }
    const failMap=new Map(fails.map(f=>[f.id,f.reason]));
    for(const it of items){
     const st=got[it.row.id];

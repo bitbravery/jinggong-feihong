@@ -2,17 +2,19 @@
 
 ## ⬇ Download / 下载
 
-**最新版本：[v0.9.214](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
+**最新版本：[v1.0.0](https://github.com/bitbravery/jinggong-feihong/releases/latest)**
 
-直接下载安装包 → [`jinggong-feihong-v0.9.214.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v0.9.214/jinggong-feihong-v0.9.214.zip)
-SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
+直接下载安装包 → [`jinggong-feihong-v1.0.0.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.0/jinggong-feihong-v1.0.0.zip)
+SHA256：以 Release 页为准（v1.0.0 发布时校验）
+
+> v1.0.0 的 Release 待维护者验收后上传；上传前仓库里的版本以 `manifest.json` 为准。
 
 > 下载后在 Edge 里「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
 > 只想要源码：`Code → Download ZIP`（不含打包好的发布包，版本需自行确认）。
 
 面向北京理工大学良乡 / 中关村两校区快递收发场景的浏览器扩展：在门户（ehall）之上做**查询、分类、批量读取、状态调整、打印申请单**，把原本要在门户里反复点击的操作收敛到一个工作台里。
 
-> 当前版本 **0.9.214**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
+> 当前版本 **1.0.0**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
 
 ## 它解决什么问题
 
@@ -26,13 +28,13 @@ SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
 
 ## 安装（推荐：下载 Release 发布包）
 
-1. 打开本仓库右侧 **Releases**（或直接访问 [v0.9.214](https://github.com/bitbravery/jinggong-feihong/releases/tag/v0.9.214)），下载发布包 `jinggong-feihong-v0.9.214.zip`；
+1. 打开本仓库右侧 **Releases**（或直接访问 [v1.0.0](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.0)），下载发布包 `jinggong-feihong-v1.0.0.zip`；
 2. 解压到**固定目录**，例如 `D:\京工飞鸿\`（升级要保持同一路径）；
    - 确认解压后该目录里**直接**能看到 `manifest.json`；如果多套了一层文件夹，加载时选到里面那一层；
    - 目录里不能有以 `_` 开头的文件，否则 Edge 会拒绝加载。
 3. 地址栏输入 `edge://extensions` → 打开「开发人员模式」→「加载解压缩的扩展」→ 选择该目录；
 4. 打开学校门户 `https://ehall.bit.edu.cn`，打开「京工飞鸿两校快件系统」标签，点工具栏红色飞鸿图标；
-5. 左下角显示 `接入版 v0.9.214 · 提交核验版` 即安装成功；
+5. 左下角显示 `接入版 v1.0.0 · 提交核验版` 即安装成功；
 6. 换电脑：旧机器「楼宇与区域 → 导出设置」，新机器「导入设置」。
 
 > 没有 Releases 时也可以走源码：点 **Code → Download ZIP**，解压后按上面第 3 步加载（需自己确认版本号）。
@@ -43,8 +45,8 @@ SHA256：`EEA589035987F5A3B0BC51670B2FAB74EACA47CEC23E4340F561644E4B3349D8`
 
 | 文件 | 内容 |
 | --- | --- |
-| [`docs/使用教程.pdf`](docs/使用教程.pdf) | 图文教程：安装、配置、日常操作、人工与扩展的映射（16 页） |
-| [`docs/部署清单.md`](docs/部署清单.md) | 办公电脑安装清单与五项目检 |
+| [`docs/使用教程.pdf`](docs/使用教程.pdf) | 图文教程：安装、配置、日常操作、人工与扩展的映射（16 页，基于 v0.9.184；回查、取消、历史精确/快速、侧栏提醒等 1.0 功能以「重要提示」页为准） |
+| [`docs/部署清单.md`](docs/部署清单.md) | 办公电脑安装清单与六项目检 |
 | [`docs/介绍讲解稿.md`](docs/介绍讲解稿.md) | 向同事介绍时的口播稿、演示顺序与问答 |
 | [`docs/交接文档.md`](docs/交接文档.md) | 目录结构、设计决定、踩坑记录 |
 
@@ -71,7 +73,7 @@ source.js              注入原站执行的命令
 live.js                工作台界面逻辑
 index.html / style.css 界面
 export.js / bulk.js / mapping.js / …  各自职责模块
-tests/                 65 个本地检查脚本（node tests/xxx.cjs）
+tests/                 82 个本地检查脚本（node tests/xxx.cjs）
 docs/                  教程、部署清单、交接与改动说明
 ```
 
@@ -82,7 +84,7 @@ docs/                  教程、部署清单、交接与改动说明
 Get-ChildItem tests -Filter *.cjs | ForEach-Object { & node $_.FullName; if ($LASTEXITCODE -ne 0) { "FAIL: $($_.Name)" } }
 ```
 
-必须全部通过（0.9.214 时共 65 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
+必须全部通过（1.0.0 时共 82 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
 
 ## 已知限制
 
@@ -95,7 +97,7 @@ Get-ChildItem tests -Filter *.cjs | ForEach-Object { & node $_.FullName; if ($LA
 
 ## 版本与发布
 
-- 版本号语义：`0.9.x`，每次改动 +1；四个文件必须一致（`tests/版本一致性检查.cjs` 校验）；
+- 版本号语义：`x.y.z`（当前 1.0.0），每次改动 +1；四个文件必须一致（`tests/版本一致性检查.cjs` 校验）；
 - 每个版本都发一个 **Release**，说明固定包含三段：**本次修复 / 已知问题 / 兼容性**；
 - 版本记录见 [`CHANGELOG.md`](CHANGELOG.md)，发布流程见 [`docs/发布规范.md`](docs/发布规范.md)。
 

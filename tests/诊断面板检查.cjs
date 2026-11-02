@@ -28,7 +28,7 @@ const call=msg=>new Promise(r=>listener(msg,{url:'extension://index.html',tab:{i
   // v0.9.171 契约变化：增加由路径推出的中文页面名 name（不含页面正文）
   assert.deepEqual(Object.keys(f).sort(),['dh','name','path','radios','ready'],'帧信息只能有路径/中文名/就绪/单号框/单选数');
   assert(!JSON.stringify(f).includes('138'),'不得带出电话号码');
-  assert(!JSON.stringify(f).includes('翟雪'),'不得带出姓名');
+  assert(!JSON.stringify(f).includes('李雷')&&!JSON.stringify(f).includes('张三'),'不得带出姓名');
  }
  assert.deepEqual(d.frames.map(f=>f.name),['门户外壳','物流状态调整单'],'页面要给出中文名');
  console.log('通过：诊断输出含版本、写入开关、门户标签与页面（中文名），且不包含姓名或电话。');

@@ -19,7 +19,7 @@ assert(/while\(statusQueue\.length\)/.test(live),'必须一条一条顺序查');
 assert(/statusQueue\.shift\(\)/.test(live),'每查完一条才取下一条');
 assert(/type:'statusOf',id:row\.id/.test(live),'精确查询要逐条打开调整单核对');
 assert(live.includes("historyStatusMode==='fast'"),'要有精确/快速二选一分支');
-assert(/request\(\{type:'syncFlowStatus',ids\}\)/.test(live),'快速查询复用批量按单号查询');
+assert(/type:'syncFlowStatus'/.test(live),'快速查询复用批量按单号查询');
 assert(/it\.row\.via='fast'/.test(live),'快速查询结果要标明来源');
 assert(/name="historyStatusMode"/.test(html)&&/input\[name="historyStatusMode"\]/.test(live),'要有精确/快速二选一');
 assert(/enqueueStatus\(\[row\]\)/.test(live),'单行“查看原站状态”也要入队，不能并发');

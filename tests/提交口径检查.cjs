@@ -29,7 +29,8 @@ assert(/consecutiveFails\+\+/.test(l)&&/continue|for\(const/.test(l),'单子失�
 
 
 // v0.9.199：改状态过程中不得跳回“快件查询”按单号回读
-assert(2===2,"queryOne 只应保留定义与 verify 一处，当前 2 处");
+const qo=(w.match(/(?<![A-Za-z])queryOne\(/g)||[]).length;
+assert.equal(qo,2,'queryOne 只应保留定义与 verify 一处，当前 '+qo+' 处');
 assert(!/已回读原站/.test(w),"失败时不再回读原站状态");
 assert(/本次不跳回“快件查询”回读/.test(w),"失败文案要说明不回读");
 console.log('通过：双信号成功口径、加载中只等不关、关不掉复用继续、仅卡加载时停批。');

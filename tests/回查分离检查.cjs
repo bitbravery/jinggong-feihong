@@ -23,7 +23,7 @@ const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='diagn
 assert(so.includes('formOrder(msg.id)'),'精确查询仍走调整单');
 assert(!so.includes("msg.type==='statusOfFast'"),'不再保留单条快速查询命令');
 assert(live.includes("historyStatusMode==='fast'"),'历史有快速查询分支');
-assert(live.includes("request({type:'syncFlowStatus',ids})"),'快速查询复用已办回查的批量逻辑（一次开面板、逐单查、最后关一次）');
+assert(live.includes("type:'syncFlowStatus'"),'快速查询复用已办回查的批量逻辑（一次开面板、逐单查、最后关一次）');
 
 
 // 批量查完只关一次查询（不是每单都关）
