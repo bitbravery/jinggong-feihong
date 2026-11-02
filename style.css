@@ -364,3 +364,14 @@ main{max-width:none}
 .sidebar-icon-only .sidebar-notes{display:none}
 .history-status-mode{display:inline-flex;align-items:center;gap:10px;font-size:12px;color:#4a5d55;margin:0 4px}
 .history-status-mode label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+
+
+/* v0.9.224：状态修改历史筛选行——字号统一、控件同高、允许换行不超出页面 */
+.history-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:14px 0;font-size:12px;max-width:100%;min-width:0}
+.history-filters .button,.history-filters label{font-size:12px;line-height:1.2;white-space:nowrap}
+.history-filters .button{padding:7px 12px}
+.history-filters input[type=date]{width:128px;min-width:0;padding:6px 7px;font-size:12px}
+.history-filters #historySearch{flex:1 1 220px;min-width:180px;max-width:100%}
+.history-filters .history-picked{font-size:12px}
+.history-status-mode{display:inline-flex;align-items:center;gap:10px;font-size:12px;white-space:nowrap}
+.history-status-mode label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}

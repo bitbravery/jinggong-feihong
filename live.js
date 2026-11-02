@@ -14,7 +14,7 @@ function setStage(t){stageText=t;renderStage();}
 function tagText(){return batchTotal>1?(batchIndex+'/'+batchTotal+' '):'';}
 function setOrderState(id,text,kind){try{const el=document.querySelector('.cs-state[data-state="'+CSS.escape(String(id))+'"]');if(!el)return;el.textContent=text;el.dataset.kind=kind||'';}catch{}}
 function setOrderNote(id,note){try{const row=document.querySelector('.cs-row[data-row="'+CSS.escape(String(id))+'"]');if(row&&note)row.title=note;}catch{}}
-if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';const bar=$('bulkBar');if(bar){bar.max=m.total||1;bar.value=m.done||0;}const cnt=$('bulkCount');if(cnt)cnt.textContent='已回查 '+m.done+'/'+m.total+' 单';if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
+if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';const bar=$('bulkBar');if(bar){bar.max=m.total||1;bar.value=m.done||0;}const cnt=$('bulkCount');if(cnt)cnt.textContent='已回查 '+m.done+'/'+m.total+' 单';if(typeof statusBusy!=='undefined'&&statusBusy&&historyStatusMode==='fast'){const b=$('batchStatusCheck');if(b)b.textContent='快速查询中 '+m.done+'/'+m.total;}if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
 let readProgress={rows:0,total:null,page:0,pages:null,percent:null,started:0,note:''};
 function drawReadProgress(){const p=readProgress,seconds=p.started?((performance.now()-p.started)/1000).toFixed(1):'0.0';$('bulkText').textContent=`已查询 ${p.rows}/${p.total??'—'} 行，第 ${p.page}/${p.pages??'—'} 页，用时 ${seconds} 秒，进度 ${p.percent===null?'待计算':p.percent+'%'}${p.note?' · '+p.note:''}`;}
 let localPage=1, pendingCampus=null, bulkCancelled=false;
@@ -66,7 +66,7 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.223')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='0.9.224')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -263,7 +263,7 @@ function renderHistory(){
    const badges=`<span class="history-badge ${o}">${E(FeiHongAudit.OUTCOME[o])}</span>${h.reverted?'<span class="history-badge reverted">已改回</span>':''}${h.revertOf?'<span class="history-badge revert">改回操作</span>':''}`;
    const note=[h.reason?'原因'+h.reason:'',h.error||'',h.nameWarn||'',h.staleToast||'',h.presses||'',h.timing?'用时 '+timingText(h.timing):''].filter(Boolean).join(' · ');
    const mismatch=FeiHongAudit.mismatch(h),unreadable=/^取不到/.test(h.currentStatus||'');
-   const live=h.currentStatus?`<small class="history-live${mismatch?' bad':''}${unreadable?' unknown':''}" title="${mismatch?'原站状态与本次改为的目标状态不一致':unreadable?'没有查到原站状态':'原站状态与本次目标一致'}">原站现为：${E(h.currentStatus)}${h.checkedAt?' · '+E(h.checkedAt.slice(5,16)):''}${mismatch?'（≠目标）':''}</small>`:'';
+   const live=h.currentStatus?`<small class="history-live${mismatch?' bad':''}${unreadable?' unknown':''}" title="${mismatch?'原站状态与本次改为的目标状态不一致':unreadable?'没有查到原站状态':'原站状态与本次目标一致'}">原站现为：${h.via==='fast'?'【快速】':h.via==='exact'?'【精确】':''}${E(h.currentStatus)}${h.checkedAt?' · '+E(h.checkedAt.slice(5,16)):''}${mismatch?'（≠目标）':''}</small>`:'';
    const revertCell=h.reverted?'<button class="button reverted" disabled>已改回原状态</button>':FeiHongAudit.canRevert(h)?`<button class="button primary" data-revert="${E(h.id)}" data-from="${E(h.from)}" data-to="${E(h.to)}" data-key="${E(h.iso)}">改回原状态</button>`:'<button class="button" disabled title="这次没有改成功，原站状态没变，无需改回">无需改回</button>';
    const sSeq=historySeq.get(h.iso)||0,sLabel=historyRunning===h.iso?('查询中 '+sSeq+'/'+historyTotal):(historyQueued.has(h.iso)?('排队中 '+sSeq+'/'+historyTotal):'');
  const actions=`${revertCell}${sLabel?`<button class="button" disabled>${sLabel}</button>`:`<button class="button" data-status="${E(h.id)}" data-key="${E(h.iso)}">查看原站状态</button>`}`;
@@ -659,6 +659,25 @@ async function pumpStatus(){
  statusBusy=true;
  const btn=$('batchStatusCheck');if(btn)btn.disabled=true;
  try{
+  if(historyStatusMode==='fast'){
+   // 快速查询：整批交给后台一次打开「快件查询」逐单查，最后统一关查询（和已办实际状态回查同一条路）
+   const items=statusQueue.slice();
+   const ids=[...new Set(items.map(x=>x.row.id).filter(id=>/^JGKD\d+$/.test(id)))];
+   if(!ids.length){statusQueue.length=0;return;}
+   if(btn)btn.textContent='快速查询中 0/'+ids.length;
+   const r=await request({type:'syncFlowStatus',ids});
+   const got=(r&&r.statuses)||{},fails=(r&&r.failures)||[];
+   const failMap=new Map(fails.map(f=>[f.id,f.reason]));
+   for(const it of items){
+    const st=got[it.row.id];
+    if(st)it.row.currentStatus=st;else it.row.currentStatus='取不到（'+(failMap.get(it.row.id)||'快速查询未返回')+'）';
+    it.row.via='fast';it.row.checkedAt=formatTime(new Date());
+   }
+   statusDone+=items.length;statusQueue.length=0;historyQueued.clear();
+   save();renderHistory();
+   toast('快速查询完成：查到 '+Object.keys(got).length+'/'+ids.length+' 单'+(fails.length?'，'+fails.length+' 单没查到（可稍后再试）':'')+'。',fails.length?10000:5000);
+   return;
+  }
   while(statusQueue.length){
    const item=statusQueue[0],row=item.row;
     historyRunning=item.iso;historyQueued.delete(item.iso);renderHistory();
@@ -667,19 +686,20 @@ async function pumpStatus(){
    while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
    statusButtonLabel();
    try{
-    const r=await request(historyStatusMode==='fast'?{type:'statusOfFast',id:row.id}:{type:'statusOf',id:row.id});
-    row.currentStatus=r.status;row.checkedAt=formatTime(new Date());
+    const r=await request({type:'statusOf',id:row.id});
+    row.currentStatus=r.status;row.via='exact';row.checkedAt=formatTime(new Date());
     collapsedDays.delete(FeiHongAudit.dayKey(row));
     toast('原站当前状态：'+r.status+'（'+formatTime(new Date())+'）',1200);
    }catch(err){
-    row.currentStatus='取不到（'+String(err.message||'').slice(0,30)+'）';row.checkedAt=formatTime(new Date());
+    row.currentStatus='取不到（'+String(err.message||'').slice(0,40)+'）';row.via='exact';row.checkedAt=formatTime(new Date());
    }
    statusQueue.shift();statusDone++;historyRunning='';
    save();renderHistory();
   }
- }finally{
-statusBusy=false;historyRunning='';historyQueued.clear();historySeq.clear();historyTotal=0;
-   try{renderHistory();}catch{}
+ }catch(e){toast('快速查询失败：'+e.message,10000);statusQueue.length=0;}
+ finally{
+  statusBusy=false;historyRunning='';historyQueued.clear();historySeq.clear();historyTotal=0;
+  try{renderHistory();}catch{}
   const btn2=$('batchStatusCheck');if(btn2)btn2.disabled=false;
   statusButtonLabel();
   try{localStorage.setItem('feihong-history-days',JSON.stringify([...collapsedDays]));}catch{}
@@ -691,7 +711,10 @@ $('batchStatusCheck').onclick=()=>{
  if(!rows.length){toast('当前列表没有可查询的记录。');return;}
  enqueueStatus(rows);
 };
-document.querySelectorAll('input[name="historyStatusMode"]').forEach(r=>r.onchange=()=>{if(r.checked)historyStatusMode=r.value;});
+try{const m=localStorage.getItem('feihong-history-status-mode');if(m==='fast'||m==='exact')historyStatusMode=m;}catch{}
+function applyHistoryStatusMode(){document.querySelectorAll('input[name="historyStatusMode"]').forEach(r=>{r.checked=r.value===historyStatusMode;});}
+applyHistoryStatusMode();
+document.addEventListener('change',e=>{const r=e.target;if(r&&r.name==='historyStatusMode'&&r.checked){historyStatusMode=r.value;try{localStorage.setItem('feihong-history-status-mode',r.value);}catch{}toast(r.value==='fast'?'已切换到「快速查询」：按单号到快件查询核对（更快）':'已切换到「精确查询」：打开物流状态调整单逐单核对（原方式）',4000);}});
 
 $('historyRows').onclick=async e=>{
  const day=e.target.dataset.day;

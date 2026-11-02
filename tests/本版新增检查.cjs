@@ -20,8 +20,10 @@ assert(worker.includes("ensurePortalPage('query')"),'查询前确保快件查询
 assert(html.includes('name="historyStatusMode"'),'历史要有精确/快速二选一');
 assert(html.includes('精确查询')&&html.includes('快速查询'),'两个选项文字');
 assert(live.includes("historyStatusMode==='fast'"),'前端按选择走快/慢');
-assert(worker.includes("msg.type==='statusOfFast'"),'后台要有快速查询命令');
-assert(worker.includes('queryOne(msg.id'),'快速查询按单号走快件查询');
+assert(live.includes("request({type:'syncFlowStatus',ids})"),'快速查询复用已办回查的批量逻辑');
+assert(live.includes("it.row.via='fast'"),'快速查询结果标明来源');
+assert(live.includes("原站现为：${h.via==='fast'?'【快速】'"),'历史里能看出是快速还是精确的结果');
+assert(/\.history-filters\{[^}]*flex-wrap:wrap/.test(css)&&/\.history-filters #historySearch\{[^}]*min-width:180px/.test(css),'历史筛选行要能换行、字号和控件不超出页面');
 
 // 4) 侧栏核心提示（深绿区域），折叠后不显示
 assert(html.includes('id="sidebarNotes"'),'侧栏要有核心提示区域');

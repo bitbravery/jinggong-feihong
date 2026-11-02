@@ -18,12 +18,12 @@ assert(sync.includes("ensurePortalPage('query')"),'回查前确保「快件查�
 assert(!sync.includes('closeFormTab'),'回查不再关其他页面');
 assert(!sync.includes('没有打开“京工飞鸿两校快件系统”'),'不再要求业务标签');
 
-// 4) 历史「查看原站状态」两种方式：精确=调整单；快速=快件查询
-const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='statusOfFast'"));
+// 4) 历史「查看原站状态」两种方式：精确=调整单；快速=复用批量按单号查询
+const so=w.slice(w.indexOf("msg.type==='statusOf'"),w.indexOf("msg.type==='diagnose'"));
 assert(so.includes('formOrder(msg.id)'),'精确查询仍走调整单');
-assert(!so.includes('queryOne(msg.id'),'精确查询不走快件查询');
-const fast=w.slice(w.indexOf("msg.type==='statusOfFast'"),w.indexOf("msg.type==='diagnose'"));
-assert(fast.includes('queryOne(msg.id'),'快速查询按单号走快件查询');
+assert(!so.includes("msg.type==='statusOfFast'"),'不再保留单条快速查询命令');
+assert(live.includes("historyStatusMode==='fast'"),'历史有快速查询分支');
+assert(live.includes("request({type:'syncFlowStatus',ids})"),'快速查询复用已办回查的批量逻辑（一次开面板、逐单查、最后关一次）');
 
 
 // 批量查完只关一次查询（不是每单都关）

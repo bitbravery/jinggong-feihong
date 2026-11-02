@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '0.9.223';
+const COMPONENT_VERSION = '0.9.224';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -403,7 +403,7 @@ async function waitSaved(stage,check){
 // 原站只有一套标签/表单：所有会驱动原站的操作在这里排队，一次只跑一个。
 // 准备成功到提交之间（准备令牌有效期内）挡住其他工作台的操作，避免改动已核对的表单；
 // 同一工作台自己按 准备→提交 串行，不挡（否则工作台刷新后会被自己的旧令牌卡 2 分钟）。
-const PORTAL_OPS=new Set(['openStandardPages','endRead','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','statusOfFast','openFlow']);
+const PORTAL_OPS=new Set(['openStandardPages','endRead','syncFlowStatus','statusPreflight','read','page','flowFirst','flowDate','bulkApprove','flowFirstPage','flowNextPage','flowNext','beginAll','prepare','submit','verify','revert','printDetail','statusOf','openFlow']);
 let portalBusy='';
 const writeHeld=(type,owner)=>!!preparedWrite&&Date.now()-preparedWrite.at<=120000&&type!=='submit'&&preparedWrite.owner!==owner;
 // 持有令牌的工作台已关闭：令牌作废，不再挡别人
@@ -995,14 +995,6 @@ mark('portal');
           if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效单号');
 const order=await formOrder(msg.id);
 return {id:order.id,status:order.status,order};
-    }
-   if(msg.type==='statusOfFast'){
-          if(!/^JGKD\d+$/.test(msg.id||''))throw Error('无效回查单号');
-const s=await queryOne(msg.id,{allowEmpty:true});
-const order=s&&s.total===1?SourceMapping.normalize(s)[0]:null;
-const st=order&&order.status;
-if(!st)throw Error('原站按单号没查到该单（可能尚未生效或被查询条件限制）。');
-return {id:msg.id,status:st,via:'query'};
     }
 if(msg.type==='diagnose'){
     const portalOut=await run({type:'portalState'});
