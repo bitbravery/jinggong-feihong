@@ -38,4 +38,9 @@ assert(/await ensureFormActive\(stage\);\s*\n\s*try\{await closeQueryPanel\(\);\
 assert(/PORTAL_OPS=new Set\(\['openStandardPages','endRead'/.test(w),'endRead 要进原站串行队列');
 assert(/if\(msg\.type==='endRead'\)\{[\s\S]{0,400}closeQueryPanel\(\)/.test(w),'批量读取结束后必须关闭查询面板');
 assert(/ended:true,closed/.test(w),'endRead 要返回关闭结果');
-console.log('通过：先点条件行红色错号，再点「关闭查询」。');
+// v1.0.0：条件行红叉是 delete_search 链接（图标没有“×”文字），要逐个清完再「关闭查询」；后台循环调用
+const cq=src.slice(src.indexOf("command.type==='closeQuery'"),src.indexOf("command.type==='toastState'"));
+assert(cq.includes('delete_search'),'条件行红叉要用 delete_search 链接识别');
+assert(/if\(delLinks\.length\)\{shoot\(delLinks\[0\]\);return \{cleared:1,more:/.test(cq),'一次清一个条件行红叉，清完再关');
+assert(/for\(let i=0;i<12;i\+\+\)[\s\S]{0,600}cleared/.test(w),'后台要循环清条件，全部清完才关闭查询');
+console.log('通过：先逐个点掉条件行红色错号，再点「关闭查询」（含查询失败的情况）。');

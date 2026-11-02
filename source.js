@@ -783,23 +783,30 @@ function sourceAction(command){
    return {gone:boxes.length===0,count:boxes.length,html:boxes[0]?String(boxes[0].outerHTML||'').replace(/\s+/g,' ').slice(0,400):''};
  }
  if(command.type==='closeQuery'){
+   if(!location.pathname.endsWith('/queryResult.htm'))return null;
    const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
-   // 1) 先点条件行右侧的红色错号（删掉条件行）
-   const closeEl=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
-   let scope=closeEl;
-   for(let n=0;n<6&&scope&&scope.parentElement&&!/条件字段/.test(text(scope));n++)scope=scope.parentElement;
-   if(!scope||!/条件字段/.test(text(scope)))scope=document.body;
    const shoot=el=>{for(const t of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));}catch{try{el.click();}catch{}}}};
+   // v1.0.0：条件行的红色错号就是原站的 delete_search 链接（图标可能没有文字，不能靠“×”文字找）。
+   // 一次只点一个，后台循环调用，直到所有条件行都清掉，再点「关闭查询」。
+   let scope=document.body;
+   const panel=Array.from(document.querySelectorAll('.mini-panel,.mini-window,div')).find(el=>vis(el)&&/条件字段/.test(text(el))&&/关闭查询/.test(text(el)));
+   if(panel)scope=panel;
+   const condRows=Array.from(scope.querySelectorAll('tr[id^="line_"]')).filter(vis);
+   const delLinks=condRows.map(row=>row.querySelector&&row.querySelector('a[onclick^="delete_search"],a[onclick*="delete_search"]')).filter(Boolean);
+   if(delLinks.length){shoot(delLinks[0]);return {cleared:1,more:delLinks.length-1,closed:false};}
+   // 兜底：认得出“×”文字/图标时，先点掉再关（保持老门户兼容）
+   const closeEl=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
+   let xscope=closeEl;
+   for(let n=0;n<6&&xscope&&xscope.parentElement&&!/条件字段/.test(text(xscope));n++)xscope=xscope.parentElement;
+   if(!xscope||!/条件字段/.test(text(xscope)))xscope=scope;
    let cleared=0;
    for(let round=0;round<4;round++){
-     const x=Array.from(scope.querySelectorAll('*')).filter(vis).filter(el=>{const t=text(el).trim();return /^[×✕✖]$/.test(t)||(el.tagName==='IMG'&&/error|del|remove/i.test(String(el.className||'')));}).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
+     const x=Array.from(xscope.querySelectorAll('*')).filter(vis).filter(el=>{const t=text(el).trim();return /^[×✕✖]$/.test(t)||(el.tagName==='IMG'&&/error|del|remove/i.test(String(el.className||'')));}).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
      if(!x)break;
      shoot(x);cleared++;
    }
-   // 2) 再点「关闭查询」回到列表
-   if(!closeEl)return {cleared,none:true};
-   shoot(closeEl);
-   return {closed:true,cleared,label:text(closeEl).slice(0,20)};
+   if(closeEl){shoot(closeEl);return {closed:true,cleared,label:text(closeEl).slice(0,20)};}
+   return {closed:!panel,cleared,already:true};
  }
  if(command.type==='toastState'){
    const t=fhToast(/^提交成功$/,true);

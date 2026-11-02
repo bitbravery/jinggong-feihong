@@ -449,7 +449,17 @@ async function queryOneRaw(id,{allowEmpty=false}={}){
  const end=Date.now()+60000;while(Date.now()<end){const out=await run({type:'snapshot',kind:'query'});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);if(results.length>1)throw Error('原站存在多个查询页面');if(results.length===1){const s=results[0];if(s.total===0&&allowEmpty)return s;if(s.total!==1||s.rows.length!==1)throw Error('原站按单号查询命中 '+(s.total??'未知')+' 条，不是唯一一条，停止操作。'+(s.scope&&s.scope!=='沿用原站当前查询条件；当前页'?'；门户当前查询条件：'+s.scope:''));const orders=SourceMapping.normalize(s);if(orders[0].id!==id||orders[0].duplicateOrder)throw Error('回查单号不匹配或重复');return s;}await pause(250);}throw Error('原站按单号查询未完成，请人工核验。');
 }
 async function closeQueryPanel(){
- try{const out=await run({type:'closeQuery'});if(out.some(r=>r&&r.closed)){await pause(150);return true;}return false;}catch{return false;}
+ // 循环：先逐个点掉条件行的红色错号（一次一个），全部清完后再点「关闭查询」；失败给一次重试
+ for(let i=0;i<12;i++){
+  let out;try{out=await run({type:'closeQuery'});}catch{return false;}
+  if(!out.length)return false;
+  if(out.some(r=>r&&r.error))return false;
+  if(out.some(r=>r&&r.closed)){await pause(150);return true;}
+  if(out.some(r=>r&&r.cleared)){await pause(120);continue;}
+  if(out.some(r=>r&&r.none))return false;
+  await pause(120);
+ }
+ return false;
 }
 // 门户的条件查询会一直停在“查询条件”面板，查完必须点「关闭查询」回到列表（用户要求：任何查询完成都要关）
 async function queryOne(id,opts){
