@@ -15,17 +15,17 @@ assert(/key:'out-transit'/.test(persp)&&/key:'in-transit',label:other\+'发出\/
   }
 }
 
-// 2) 打印：按 0.9.184 版式，所有尺寸放大 120%
-assert(/\.pf-table col\.c1\{width:16%\}/.test(live)&&/col\.c2\{width:34%\}/.test(live),'打印列宽应为 16%/34%');
-assert(/col\.c3\{width:16%\}/.test(live)&&/col\.c4\{width:34%\}/.test(live),'第二组列宽也应为 16%/34%');
-assert(/\.pf-title\{[^}]*font-size:31\.2px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:19\.2px/.test(live),'0.9.184 版式放大 120%：标题 31.2px、单元格 19.2px');
-assert(/@page\{size:A4 landscape;margin:10mm 5mm\}/.test(live),'纸张 A4 横向、左右边距 5mm');assert(/body\{width:93%;margin:0 auto/.test(live),'内容宽度约占纸面 90%');
-assert(/font:14\.4px\/1\.7/.test(live)&&/\.pf-tip\{[^}]*font-size:14\.4px/.test(live),'正文字号也放大 120%');
-assert(/\.print-form \.pf-table col\.c1\{width:16%\}/.test(css),'预览列宽要与打印一致');
-assert(/\.print-form \.pf-table th,\.print-form \.pf-table td\{font-size:19\.2px/.test(css),'预览字号同样放大 120%');
+// 2) 打印：按复写纸 9×5 排版，内容约占纸面 90%（字体沿用之前好看的一版）
+assert(/\.pf-table col\.c1\{width:20%\}/.test(live)&&/col\.c2\{width:30%\}/.test(live),'打印列宽应为 20%/30%');
+assert(/col\.c3\{width:20%\}/.test(live)&&/col\.c4\{width:30%\}/.test(live),'第二组列宽也应为 20%/30%');
+assert(/\.pf-title\{[^}]*font-size:26px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'打印字号：标题 26px、单元格 15px');
+assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(live),'纸张自适应，上下左右留白 6/3/2mm');assert(/body\{width:94%;margin:0 auto/.test(live),'内容宽度约占纸面 90%');
+assert(/\.pf-tip\{[^}]*font-size:12px/.test(live),'温馨提示 12px');
+assert(/\.print-form \.pf-table col\.c1\{width:20%\}/.test(css),'预览列宽要与打印一致');
+assert(/\.print-form \.pf-table th,\.print-form \.pf-table td\{font-size:15px/.test(css),'预览字号要与打印一致');
 assert(/\.tips-panel\{max-width:none;width:100%/.test(css),'重要提示要铺满页面');
 assert(/column-width:540px/.test(css),'宽屏重要提示自动分栏');
-assert(/@page\{size:A4;margin:10mm 5mm\}/.test(css),'浏览器直接打印左右边距也收窄');
+assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(css),'浏览器直接打印也按 9×5 留白');
 
 // 3) 目标状态：五个点选而不是下拉
 assert(/id="targetStatus" class="status-picker"/.test(html),'目标状态要改成点选容器');

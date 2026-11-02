@@ -122,33 +122,33 @@ body.has-selection-bar #work{padding-bottom:96px}
 /* v0.9.75：扩展内打印申请单 */
 .print-dialog{width:880px;max-width:96vw;padding:0;border:0;border-radius:12px}
 .print-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
-.print-form{padding:31.2px 40.8px;background:#fff;color:#111;font-size:15.6px}
-.pf-title{text-align:center;font-size:26.4px;margin:7.2px 0 4.8px}
+.print-form{padding:24px 30px;background:#fff;color:#111;font-size:12px}
+.pf-title{text-align:center;font-size:26px;margin:0 0 3px}
 .pf-no{text-align:center;color:#333;margin:0 0 16.8px;letter-spacing:.6px}
-.pf-sec{background:#e9edf2;border-left:4.8px solid #2f6fb3;padding:7.2px 12px;margin:16.8px 0 9.6px;font-weight:600}
+.pf-sec{background:#e9edf2;border-left:4px solid #2f6fb3;padding:5px 9px;margin:7px 0 4px;font-size:15px;font-weight:600}
 .pf-table{width:100%;border-collapse:collapse;margin-bottom:7.2px}
-.pf-table th,.pf-table td{border:1px solid #333;padding:7.2px 9.6px;font-weight:400;text-align:left}
+.pf-table th,.pf-table td{border:1px solid #333;padding:4px 8px;font-weight:400;text-align:left}
 .pf-table th{width:14%;white-space:nowrap;background:#fafafa}
 .pf-status{margin:4px 0 10px}
-.pf-tip-title{margin:12px 0 4.8px;font-weight:600}
-.pf-tip{margin:4.8px 0;line-height:1.92}
+.pf-tip-title{margin:5px 0 2px;font-size:12px;font-weight:600}
+.pf-tip{margin:2px 0;font-size:12px;line-height:1.5}
 @media print{
  body *{visibility:hidden}
  #printForm,#printForm *{visibility:visible}
- #printForm{position:absolute;left:0;right:0;top:0;width:93%;margin:0 auto;padding:0}
+ #printForm{position:absolute;left:0;right:0;top:0;width:94%;margin:0 auto;padding:0}
  .print-actions{display:none}
  /* v1.0.1：纸张尺寸交给打印机，上边距留白、下/左/右尽量小；内容宽度约占纸面 90% */
- @page{size:A4;margin:10mm 5mm}
+ @page{size:auto;margin:6mm 3mm 2mm}
 }
 
 /* v0.9.82：预览与打印同列宽 */
-.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:16%}.print-form .pf-table col.c2{width:34%}.print-form .pf-table col.c3{width:16%}.print-form .pf-table col.c4{width:34%}
+.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:20%}.print-form .pf-table col.c2{width:30%}.print-form .pf-table col.c3{width:20%}.print-form .pf-table col.c4{width:30%}
 
 /* v0.9.83：读取区不裁切、日期列收窄；预览表格字号 */
 .header-actions{max-width:none}
 .read-actions{flex-wrap:wrap;justify-content:flex-end;overflow:visible}
 .read-pages #flowFrom,.read-pages #flowTo{width:100px;min-width:100px}
-.print-form .pf-table th,.print-form .pf-table td{font-size:19.2px;padding:10.8px 14.4px}
+.print-form .pf-table th,.print-form .pf-table td{font-size:15px;padding:4px 8px}
 
 /* v0.9.84：精简流程页顶部 */
 #personTabs{display:none!important}
