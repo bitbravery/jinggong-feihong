@@ -72,35 +72,29 @@ const PageFont={key:'feihong-page-font',min:10,max:26,base:14,
 window.FeiHongPageFont=PageFont;
 function orders(){return records[kind()];}
 function filtered(){const selectedDirection=$('direction').value;const column=CampusPerspective.columns(campus).find(c=>c.key===activeColumn)||CampusPerspective.columns(campus)[0];const f={status:'all',direction:'all',identity:$('identity').value,region:$('region').value,search:$('search').value,officeKeywords};return FeiHong.queryRows(orders().filter(o=>matches(o,f,mappings)&&CampusPerspective.includes(o,campus,selectedDirection)&&(currentView==='flow'?o.flow===flowTab&&o.fromCampus===campus:CampusPerspective.matchesColumns(o,campus,activeColumns,mappings))),{day:$('orderDay').value,sort:sortColumn,descending:sortDescending});}
-function setSnapshot(s){
- lastReadError='';
- const parsed=SourceMapping.normalize(s);
- if(s.kind==='flow'&&s.flowTab){
-  // 流程按分类合并：只替换本次读到的分类，保留另一类数据
-  records.flow=[...records.flow.filter(o=>o.flow!==s.flowTab),...parsed];
- }else{
-  records[s.kind]=parsed;
- }
- snapshots[s.kind]=s;
-}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.12')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
-// v1.0.12：再次读取当前页时，把本次读到的行并入已有列表：旧的保留、新的追加、同一条用原站新数据更新
-function mergeSnapshot(s){
- lastReadError='';
- const parsed=SourceMapping.normalize(s);
- const isFlow=s.kind==='flow'&&s.flowTab;
- const oldRows=isFlow?records.flow.filter(o=>o.flow===s.flowTab):records[s.kind];
- const others=isFlow?records.flow.filter(o=>o.flow!==s.flowTab):[];
- if(!oldRows.length){setSnapshot(s);return {first:true,added:parsed.length,updated:0,total:parsed.length};}
+function mergeParsed(parsed,kind,flowTab){
+ const isFlow=kind==='flow'&&flowTab;
+ const oldRows=isFlow?records.flow.filter(o=>o.flow===flowTab):records[kind];
+ const others=isFlow?records.flow.filter(o=>o.flow!==flowTab):[];
  const key=o=>o.id+'|'+(SourceMapping.fingerprint?SourceMapping.fingerprint(o):'');
  const map=new Map();for(const o of oldRows)map.set(key(o),o);
  let added=0,updated=0;
  for(const n of parsed){const k=key(n),prev=map.get(k);if(!prev){map.set(k,n);added++;}else{updated++;map.set(k,{...prev,...n,history:prev.history||n.history,recordKey:prev.recordKey});}}
- const merged=[...map.values()];
- if(isFlow)records.flow=[...others,...merged];else records[s.kind]=merged;
- snapshots[s.kind]={...s,rows:merged,total:merged.length,pageSize:null,merged:true,mergeAdded:added,mergeUpdated:updated,mergeOld:oldRows.length};
- return {first:false,added,updated,total:merged.length};
+ const rows=[...map.values()];
+ if(isFlow)records.flow=[...others,...rows];else records[kind]=rows;
+ return {rows,added,updated,oldCount:oldRows.length,others,isFlow};
 }
+function setSnapshotExtra(s,{singlePage=false}={}){
+ lastReadError='';
+ const parsed=SourceMapping.normalize(s);
+ const m=mergeParsed(parsed,s.kind,s.flowTab);
+ snapshots[s.kind]={...s,rows:m.rows,total:m.rows.length,pageSize:singlePage?null:s.pageSize,merged:m.oldCount>0,mergeAdded:m.added,mergeUpdated:m.updated,mergeOld:m.oldCount};
+ return {first:m.oldCount===0,added:m.added,updated:m.updated,total:m.rows.length,rows:m.rows};
+}
+// 所有读取都做加法：旧记录保留，本次新出现的追加，同一条用新数据更新
+function setSnapshot(s){return setSnapshotExtra(s);}
+function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.13')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -367,17 +361,17 @@ async function readFlows(pages=5){
    Object.assign(readProgress,{rows:p.rowsRead,total:target??p.total,page:p.page,pages:pagesTarget,percent,note:p.tab});
    drawReadProgress();$('bulkBar').max=100;$('bulkBar').value=percent;
   }});
-  const fresh=parts.flatMap(p=>SourceMapping.normalize(p));records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...fresh];
+  const fresh=parts.flatMap(p=>SourceMapping.normalize(p));const agg=mergeParsed(fresh,'flow',flowTab);
   // v0.9.206：原站把“已办”的状态一律写成订单申请，必须回「快件查询」核对真实状态
 
-  snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'流程（前 '+pages+' 页）'};
+  snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'流程（前 '+pages+' 页）',mergeAdded:agg.added,mergeUpdated:agg.updated};
   readProgress.percent=100;readProgress.rows=records.flow.length;readProgress.total=records.flow.length;$('bulkBar').value=100;
   try{await request({type:'flowFirstPage'});}catch{}
- $('bulkText').textContent='已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），当前共 '+records.flow.length+' 条';
+ $('bulkText').textContent='已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），新增 '+agg.added+' 条，当前共 '+records.flow.length+' 条';
   $('bulkCount').textContent='待办 '+tally('待办')+' 条 · 已办 '+tally('已办')+' 条';
-  toast('已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒。');refreshNotices();
+  toast('已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），新增 '+agg.added+' 条，用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒。');refreshNotices();
  }catch(e){
-  if(e.partial&&e.partial.length){records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...e.partial.flatMap(p=>SourceMapping.normalize(p))];snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,total:records.flow.length,pageSize:null,rows:e.partial.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:e.partial.reduce((n,p)=>n+p.pagesRead,0),pageCount:e.partial.reduce((n,p)=>n+p.pageCount,0),scope:'流程（未读完）'};}
+  if(e.partial&&e.partial.length){const agg=mergeParsed(e.partial.flatMap(p=>SourceMapping.normalize(p)),'flow',flowTab);snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,total:records.flow.length,pageSize:null,rows:e.partial.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:e.partial.reduce((n,p)=>n+p.pagesRead,0),pageCount:e.partial.reduce((n,p)=>n+p.pageCount,0),scope:'流程（未读完）',mergeAdded:agg.added,mergeUpdated:agg.updated};}
   lastReadError=e.message;$('bulkText').textContent=e.message;$('bulkCount').textContent='流程读取未完成';
   toast(e.message);
  }finally{clearInterval(timer);$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readFlows').textContent='读取全部流程';render();}
@@ -844,7 +838,7 @@ setInterval(()=>{if(!busy)refreshNotices();},60000);
 setTimeout(()=>refreshNotices(),1500);
 const historyRange=FeiHongDates.recentMonth();$('historyFrom').value=historyRange.from;$('historyTo').value=historyRange.to;view('orders');loadDurableAudit();
 
-async function changePage(direction){if(busy||currentView!=='orders')return;busy=true;render();try{const s=await request({type:'page',direction});setSnapshot(s);selected.clear();render();toast('已读取原站第 '+s.page+' 页，共 '+s.rows.length+' 件。');}catch(e){toast(e.message);}finally{busy=false;render();}}
+async function changePage(direction){if(busy||currentView!=='orders')return;busy=true;render();try{const s=await request({type:'page',direction});const m=setSnapshot(s);selected.clear();render();toast('已读取原站第 '+s.page+' 页：新增 '+m.added+' 条、更新 '+m.updated+' 条，本地共 '+m.total+' 条。');}catch(e){toast(e.message);}finally{busy=false;render();}}
 $('prevPage').onclick=()=>changePage('prev');$('nextPage').onclick=()=>changePage('next');
 
 $('localPrev').onclick=()=>{localPage=Math.max(1,localPage-1);render();};$('localNext').onclick=()=>{localPage++;render();};
@@ -858,7 +852,7 @@ $('readAll').onclick=async()=>{
  try{
   const readId=String(Date.now());activeReadId=readId;await requireComponent();
   const complete=await FeiHongBulk.scanAll({range,request:m=>request({...m,readId}),isCancelled:()=>bulkCancelled,onProgress:p=>{$('bulkText').textContent=(p.verifying?'正在进行首尾复核':'正在读取')+'：'+p.rowsRead+' / '+p.total+' 行，第 '+p.page+' / '+p.pages+' 页';const percent=p.total?Math.min(99,Math.floor(p.rowsRead/p.total*100)):0;$('bulkBar').max=100;$('bulkBar').value=percent;Object.assign(readProgress,{rows:p.rowsRead,total:p.total,page:p.page,pages:p.pages,percent,note:p.verifying?'复核中':''});drawReadProgress();$('bulkCount').textContent='已查询 '+p.rowsRead+' / '+p.total+' 条 · 进度 '+percent+'%'+(p.verifying?' · 正在复核完整性':'');}});
-  setSnapshot(complete);Object.assign(readProgress,{rows:complete.rows.length,total:complete.total,page:complete.pagesRead,pages:complete.pageCount,percent:100,note:'已完成'});$('bulkBar').value=100;$('bulkCount').textContent='已查询 '+complete.rows.length+' / '+complete.total+' 条 · 进度 100% · 完整性复核通过';$('bulkText').textContent='已完成：'+complete.rows.length+' 行，'+complete.pagesRead+' 页，'+range.from+' 至 '+range.to+' 所有物流状态。';toast('全部快件页面读取与首尾核对完成，用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒。');
+  const mAll=setSnapshot(complete);Object.assign(readProgress,{rows:mAll.total,total:mAll.total,page:complete.pagesRead,pages:complete.pageCount,percent:100,note:'已完成'});$('bulkBar').value=100;$('bulkCount').textContent='已查询 '+mAll.total+' 条（本次新增 '+mAll.added+'） · 进度 100% · 完整性复核通过';$('bulkText').textContent='已完成：本次新增 '+mAll.added+' 条，本地共 '+mAll.total+' 条，'+complete.pagesRead+' 页，'+range.from+' 至 '+range.to+' 所有物流状态。';toast('全部快件页面读取与首尾核对完成，本次新增 '+mAll.added+' 条，本地共 '+mAll.total+' 条，用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒。');
  }catch(e){if(e.partial?.rows.length){e.partial.complete=false;setSnapshot(e.partial);}lastReadError=e.message;readProgress.note=e.message;$('bulkText').textContent=e.message;if(!$('bulkBar').hasAttribute('value')){$('bulkBar').max=100;$('bulkBar').value=0;$('bulkCount').textContent='已查询 0 条 · 未完成日期筛选或总数确认';}else $('bulkCount').textContent+=' · 批次未完成';toast(e.message);}
  finally{await request({type:'endRead'}).catch(()=>{});activeReadId=null;clearInterval(elapsedTimer);drawReadProgress();$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readAll').textContent='自定义时段';$('cancelBulk').disabled=true;render();}
 };

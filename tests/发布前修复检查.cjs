@@ -48,7 +48,7 @@ assert(/try\{await requireComponent\(\);\}catch\(err\)\{toast\(err\.message,8000
 assert(live.includes('statusQueue.splice(0)'),'快速查询要逐个处理队列，不能整体清空');
 assert(!/快速查询[\s\S]{0,2000}statusQueue\.length=0/.test(live),'快速查询结束不能把新入队记录静默清掉');
 // 12) 流程部分读取失败要保留另一个分类；流程完整性不再谎报“近一个月”
-assert(live.includes("records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...e.partial.flatMap"),'流程读取失败也要保留其他分类');
+assert(live.includes("mergeParsed(e.partial.flatMap(p=>SourceMapping.normalize(p)),'flow',flowTab)"),'流程读取失败也要并入旧数据并保留其他分类');
 assert(live.includes('limited:true'),'流程读取要标记为“前 N 页/未完整”');
 assert(live.includes("currentView==='flow'&&s)$('scopeFooter')")&&live.includes("currentView==='flow'&&!lastReadError&&s)$('connection')"),'流程页读取状态用独立文案');
 // 13) 流程视图改状态只取当前分类，避免旧待办副本误拦截

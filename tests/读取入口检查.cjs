@@ -10,5 +10,5 @@ assert(!live.includes('正在读取待办、已办、抄送给我'));
 assert(live.includes("$('readSource').textContent='读取当前页';"),'两个页面都用“读取当前页”');
 assert(live.includes("$('flowPagesWrap').hidden=v!=='flow'"),'流程页显示“前 N 页”控件');
 assert(live.includes('readFlows(n)'),'流程页按页数读取');
-assert(live.includes('o.flow!==s.flowTab'),'流程读取必须按分类合并，不能整块替换（否则读已办会冲掉待办）');
+assert(live.includes('function mergeParsed')&&/if\(isFlow\)records\.flow=\[\.\.\.others,\.\.\.rows\]/.test(live),'流程读取必须按分类合并，不能整块替换（否则读已办会冲掉待办）');
 console.log('通过：快件页与流程页使用同一组三个读取入口，各自按自己的数据源读取。');
