@@ -634,21 +634,33 @@ function sourceAction(command){
   const fhDialogs=()=>Array.from(document.querySelectorAll('.mini-messagebox,.mini-window,.mini-panel')).filter(b=>fhVis(b)&&/您确定要提交吗/.test(text(b)));
   if(command.type==='confirmSubmit'){
    const dirtyAlert=fhDirtyAlert();
+   let retry=window.__fhDirtyRetry;
+   if(!retry||retry.token!==command.token)retry=window.__fhDirtyRetry={token:command.token,count:0,phase:'',at:0};
    if(dirtyAlert){
-     let retry=window.__fhDirtyRetry;
-     if(!retry||retry.token!==command.token)retry=window.__fhDirtyRetry={token:command.token,count:0};
      const text=dirtyAlert.text.replace(/^提示/,'').replace(/确定$/,'').trim().slice(0,90);
-     fhDismiss(dirtyAlert.box);
-     // v1.0.0：重提前先核对当前表单是不是本单，避免把别的单再提交一次
+     if(retry.count===0){
+       fhDismiss(dirtyAlert.box);
+       retry.count=1;retry.phase='closing';retry.at=Date.now();
+       return {waiting:true,seen:true,dirtyRetry:1,diag:'原站提示数据不完整 → 已点「确定」，等提示框关闭后再重新提交'};
+     }
+     if(retry.phase==='closing'){
+       fhDismiss(dirtyAlert.box);
+       if(Date.now()-retry.at<2500)return {waiting:true,seen:true,dirtyRetry:1,diag:'数据不完整提示还在关闭，稍等再重新提交…'};
+       return {error:'原站提示「'+text+'」；提示框一直没关掉，本单未提交，继续下一单。'};
+     }
+     // v1.0.4：只有“重新提交之后”又弹出提示才算反复拦截；重新提交前先核对表单单号
+     return {error:'原站提示「'+text+'」；已重新提交一次仍被拦截，本单未提交，继续下一单。'};
+   }
+   if(retry.count===1&&retry.phase==='closing'){
+     if(Date.now()-retry.at<450)return {waiting:true,seen:true,dirtyRetry:1,diag:'数据不完整提示已关闭，稍等再重新提交…'};
      let dhNow='';try{dhNow=(document.getElementById('DH$text')?.value||'').trim();}catch{}
      if(command.order&&command.order.id&&dhNow&&dhNow!==command.order.id)return {error:'原站提示数据不完整，但当前表单里是「'+dhNow+'」不是本单；为避免提交错单，未重新提交，已跳过本单。'};
-     if(retry.count>=1)return {error:'原站提示「'+text+'」；已重新提交一次仍被拦截，本单未提交，继续下一单。'};
-     retry.count++;
      let send=null;
      try{send=document.getElementById('sendBtn')||(window.parent&&window.parent.document&&window.parent.document.getElementById('sendBtn'));}catch{}
-     if(!send)return {error:'原站提示「'+text+'」；已关闭提示，但没找到右上角“提交”，无法重新提交，本单未提交。'};
+     if(!send)return {error:'原站数据不完整提示已关闭，但没找到右上角“提交”，无法重新提交，本单未提交。'};
      try{send.click();}catch{}
-     return {waiting:true,seen:true,dirtyRetry:retry.count,diag:'原站提示数据不完整 → 已点确定并重新提交（第 '+retry.count+' 次）'};
+     retry.phase='resent';retry.at=Date.now();
+     return {waiting:true,seen:true,dirtyRetry:1,diag:'数据不完整提示已关闭，已重新点一次「提交」'};
    }
    // 成功只认：本单点过「确定」之后新出现的“提交成功”（现场 0.9.176：页面上残留/别处的“提交成功”曾让没点确定的单被记成已改好）
    const okText=fhPressed(command.token)&&fhToast(/^提交成功$/,true);
