@@ -83,7 +83,24 @@ function setSnapshot(s){
  }
  snapshots[s.kind]=s;
 }
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.11')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.12')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+// v1.0.12：再次读取当前页时，把本次读到的行并入已有列表：旧的保留、新的追加、同一条用原站新数据更新
+function mergeSnapshot(s){
+ lastReadError='';
+ const parsed=SourceMapping.normalize(s);
+ const isFlow=s.kind==='flow'&&s.flowTab;
+ const oldRows=isFlow?records.flow.filter(o=>o.flow===s.flowTab):records[s.kind];
+ const others=isFlow?records.flow.filter(o=>o.flow!==s.flowTab):[];
+ if(!oldRows.length){setSnapshot(s);return {first:true,added:parsed.length,updated:0,total:parsed.length};}
+ const key=o=>o.id+'|'+(SourceMapping.fingerprint?SourceMapping.fingerprint(o):'');
+ const map=new Map();for(const o of oldRows)map.set(key(o),o);
+ let added=0,updated=0;
+ for(const n of parsed){const k=key(n),prev=map.get(k);if(!prev){map.set(k,n);added++;}else{updated++;map.set(k,{...prev,...n,history:prev.history||n.history,recordKey:prev.recordKey});}}
+ const merged=[...map.values()];
+ if(isFlow)records.flow=[...others,...merged];else records[s.kind]=merged;
+ snapshots[s.kind]={...s,rows:merged,total:merged.length,pageSize:null,merged:true,mergeAdded:added,mergeUpdated:updated,mergeOld:oldRows.length};
+ return {first:false,added,updated,total:merged.length};
+}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -93,7 +110,7 @@ async function read(){
      toast(keep?'原站查询页暂无数据（可能还在加载），已保留上次结果；可再点一次「读取当前页」。':'原站查询页暂无数据：请确认门户停在查询结果页并已查询，再点「读取当前页」。');
      busy=false;$('bulkProgress').hidden=true;$('readSource').textContent='读取当前页';render();return;
    }
-   setSnapshot(s);Object.assign(readProgress,{rows:s.rows.length,total:s.rows.length,page:1,pages:1,percent:100,note:'仅当前页'});drawReadProgress();$('bulkCount').textContent='已查询 '+s.rows.length+' 条 · 当前页进度 100%（仅本页）';$('bulkBar').max=100;$('bulkBar').value=100;render();toast('读取完成，已逐列映射 '+s.rows.length+' 件原站记录。');}
+   const merge=mergeSnapshot(s);Object.assign(readProgress,{rows:merge.total,total:merge.total,page:1,pages:1,percent:100,note:'仅当前页'});drawReadProgress();$('bulkCount').textContent='已查询 '+merge.total+' 条 · '+(merge.first?'当前页进度 100%（仅本页）':'已合并（新增 '+merge.added+' / 更新 '+merge.updated+'）');$('bulkBar').max=100;$('bulkBar').value=100;render();toast(merge.first?'读取完成，已逐列映射 '+merge.total+' 件原站记录。':'原站当前页已合并：新增 '+merge.added+' 条、更新 '+merge.updated+' 条，共 '+merge.total+' 条（保留之前读取的旧记录）。');}
  catch(e){lastReadError=e.message;$('connection').textContent='读取失败：'+e.message+' 现有列表未更新，请勿把旧列表当作最新结果。';readProgress.note='读取失败：'+e.message;drawReadProgress();$('bulkCount').textContent='已查询 0 条 · 本次读取未完成';$('bulkBar').max=100;$('bulkBar').value=0;toast(e.message);}
  finally{busy=false;$('bulkProgress').hidden=true;$('readSource').textContent='读取当前页';render();}
 }
