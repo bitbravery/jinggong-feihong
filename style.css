@@ -123,8 +123,8 @@ body.has-selection-bar #work{padding-bottom:96px}
 .print-dialog{width:880px;max-width:96vw;padding:0;border:0;border-radius:12px}
 .print-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
 .print-form{padding:24px 30px;background:#fff;color:#111;font-size:12px}
-.pf-title{text-align:center;font-size:26px;margin:0 0 3px}
-.pf-no{text-align:center;color:#333;margin:0 0 16.8px;letter-spacing:.6px}
+.pf-title{text-align:center;font-size:15px;margin:0 0 2px}
+.pf-no{text-align:center;color:#333;margin:0 0 6px;font-size:15px;letter-spacing:.2px}
 .pf-sec{background:#e9edf2;border-left:4px solid #2f6fb3;padding:5px 9px;margin:7px 0 4px;font-size:15px;font-weight:600}
 .pf-table{width:100%;border-collapse:collapse;margin-bottom:7.2px}
 .pf-table th,.pf-table td{border:1px solid #333;padding:4px 8px;font-weight:400;text-align:left}
@@ -135,7 +135,7 @@ body.has-selection-bar #work{padding-bottom:96px}
 @media print{
  body *{visibility:hidden}
  #printForm,#printForm *{visibility:visible}
- #printForm{position:absolute;left:0;right:0;top:0;width:94%;margin:0 auto;padding:0}
+ #printForm{position:absolute;left:0;right:0;top:0;width:80%;margin:0 auto;padding:0}
  .print-actions{display:none}
  /* v1.0.1：纸张尺寸交给打印机，上边距留白、下/左/右尽量小；内容宽度约占纸面 90% */
  @page{size:auto;margin:6mm 3mm 2mm}
