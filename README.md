@@ -73,7 +73,7 @@ source.js              注入原站执行的命令
 live.js                工作台界面逻辑
 index.html / style.css 界面
 export.js / bulk.js / mapping.js / …  各自职责模块
-tests/                 83 个本地检查脚本（node tests/xxx.cjs）
+tests/                 84 个本地检查脚本（node tests/xxx.cjs）
 docs/                  教程、部署清单、交接与改动说明
 ```
 
@@ -84,7 +84,7 @@ docs/                  教程、部署清单、交接与改动说明
 Get-ChildItem tests -Filter *.cjs | ForEach-Object { & node $_.FullName; if ($LASTEXITCODE -ne 0) { "FAIL: $($_.Name)" } }
 ```
 
-必须全部通过（1.0.0 时共 83 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
+必须全部通过（1.0.0 时共 84 个）。版本号需同时改 4 处（`manifest.json`、`worker.js`、`live.js`、`index.html`），`tests/版本一致性检查.cjs` 会校验。
 
 ## 已知限制
 
