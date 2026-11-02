@@ -11,8 +11,9 @@ assert(/if\(width<=110\)width=232;/.test(sidebar),'新打开侧栏应展开');
 assert(live.includes("let currentView='orders'"),'默认视图应为快件查询及状态调整');
 assert(live.includes("view('orders');loadDurableAudit();"),'启动时应切到快件查询页');
 
-// 3) 进入状态修改历史回到顶部
-assert(/if\(v==='history'\)\{try\{const rows=document\.getElementById\('historyRows'\);if\(rows\)rows\.scrollTop=0;/.test(live),'历史页打开时列表回到顶部');
+// 3) 页面滚动按页记忆：首次进入在顶部，切走再切回恢复上次位置（不再强制回顶）
+assert(live.includes('const viewScroll='),'要记录每个页面的滚动位置');
+assert(!live.includes("rows.scrollTop=0"),'历史页不再强制回顶');
 
 // 4) 表格自适应：列宽按比例、表格始终 100%
 assert(/cols\.forEach\(\(c,i\)=>c\.style\.width=\(widths\[i\]\/total\*100\)\.toFixed\(4\)\+'%'\)/.test(layout),'快件表列宽按比例分配');
@@ -28,4 +29,4 @@ assert(/\.header-layout-controls\{[^}]*flex:1 1 100%!important/.test(css),'字�
 assert(/#queryRow>select\{flex:1 1 110px/.test(css),'方向/身份/区域要一起压缩');
 assert(/\.region-tag\.north/.test(css)&&/\.region-tag\.east/.test(css)&&/\.region-tag\.south/.test(css)&&/\.region-tag\.southeast/.test(css),'四个校区要有不同颜色');
 assert(/'北校区':'north'/.test(live)&&/'东南校区':'southeast'/.test(live),'地址格要按区域套颜色类');
-console.log('通过：侧栏默认展开、默认进快件查询、历史回到顶部、两张表都自适应宽度。');
+console.log('通过：侧栏默认展开、默认进快件查询、页面滚动按页记忆、两张表都自适应宽度。');
