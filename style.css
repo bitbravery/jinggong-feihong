@@ -142,7 +142,7 @@ body.has-selection-bar #work{padding-bottom:96px}
 }
 
 /* v0.9.82：预览与打印同列宽 */
-.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:20%}.print-form .pf-table col.c2{width:30%}.print-form .pf-table col.c3{width:20%}.print-form .pf-table col.c4{width:30%}
+.print-form .pf-table{table-layout:fixed}.print-form .pf-table col.c1{width:16%}.print-form .pf-table col.c2{width:24%}.print-form .pf-table col.c3{width:24%}.print-form .pf-table col.c4{width:36%}
 
 /* v0.9.83：读取区不裁切、日期列收窄；预览表格字号 */
 .header-actions{max-width:none}
