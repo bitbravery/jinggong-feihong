@@ -18,16 +18,16 @@ assert(/key:'out-transit'/.test(persp)&&/key:'in-transit',label:other\+'发出\/
 // 2) 打印：列宽 20/30/20/30（2:3），整体字号放大约 120%
 assert(/\.pf-table col\.c1\{width:20%\}/.test(live)&&/col\.c2\{width:30%\}/.test(live),'打印列宽应为 20%/30%');
 assert(/col\.c3\{width:20%\}/.test(live)&&/col\.c4\{width:30%\}/.test(live),'第二组列宽也应为 20%/30%');
-assert(/\.pf-table th,\.pf-table td\{[^}]*font-size:12px/.test(live),'打印单元格字号压缩到 12px，保证 9×5 一页');
+assert(/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'打印单元格字号 15px，9×5 一页且填满');
 assert(/\.print-form \.pf-table col\.c1\{width:20%\}/.test(css),'预览列宽要与打印一致');
 assert(!/col\.c1\{width:16%\}/.test(css),'预览不应残留旧的 16% 列宽');
-// v1.0.2：打印一页放得下（9×5 复写纸）；重要提示铺满页面并可分栏
+// v1.0.3：9×5 一页且把页面基本填满（标题 26 / 单元格 15 / 提示 12）
 assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(live),'打印纸张交给打印机，上边留白、下/左/右很小');
 assert(/body\{width:94%;margin:0 auto/.test(live),'打印内容约占纸面 90% 且随纸张宽度自适应');
 assert(!/size:A4 landscape/.test(live),'打印不再写死 A4 横向');
-assert(/\.pf-title\{[^}]*font-size:20px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:12px/.test(live),'打印字号要压缩到 9×5 一页');
+assert(/\.pf-title\{[^}]*font-size:26px/.test(live)&&/\.pf-table th,\.pf-table td\{[^}]*font-size:15px/.test(live),'打印字号要保证 9×5 一页又尽量填满');
 assert(/\.pf-table\{[^}]*page-break-inside:avoid/.test(live)&&/\.pf-table tr\{page-break-inside:avoid\}/.test(live),'表格不要跨页断开');
-assert(/\.pf-tip\{[^}]*font-size:10px/.test(live),'温馨提示字号也要压缩');
+assert(/\.pf-tip\{[^}]*font-size:12px/.test(live),'温馨提示字号也要与页面高度匹配');
 assert(/\.tips-panel\{max-width:none;width:100%/.test(css),'重要提示要铺满页面');
 assert(/column-width:540px/.test(css),'宽屏重要提示自动分栏');
 assert(/@page\{size:auto;margin:6mm 3mm 2mm\}/.test(css),'浏览器直接打印也用自适应纸张');
