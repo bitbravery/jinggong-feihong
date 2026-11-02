@@ -71,7 +71,7 @@ async function ensurePortalPage(kind,stage,generation){
  throw Error('门户上方标签没有切到「'+spec.label+'」（一直停在别的页面），已停止这一步；原站未提交。请到原站确认后再试。');
 }
 async function waitSnapshot(kind,predicate=()=>true,label='原站列表',flowTab,budget=60000){const end=Date.now()+budget;let last;while(Date.now()<end){const out=await run({type:'snapshot',kind,flowTab});if(out.some(r=>r.timeout)){await pause(250);continue;}const error=out.find(r=>r.error);if(error)throw Error(error.error);let results=out.filter(r=>r.rows);if(results.length>1&&kind==='flow'){const pref=results.filter(r=>flowTab&&r.active===flowTab);results=pref.length?pref:[results[0]];}else if(results.length>1)throw Error('发现多个候选列表，停止读取。');if(results.length){last=results[0];if(predicate(last))return last;}if(kind==='flow')flowStage(label+'：'+describeFlow(out)+(last?'；未就绪：'+notReady(last):''));await pause(200);}throw Error(label+'仍未完成加载（等待60秒；页码 '+(last?.page??'未知')+'，总数 '+(last?.total??'未知')+'）。已读取部分不算完整结果。');}
-async function snapshot(kind,flowTab){return waitSnapshot(kind,s=>kind!=='flow'||!flowTab||s.active===flowTab,'原站列表',flowTab);}
+async function snapshot(kind,flowTab){return waitSnapshot(kind,s=>kind!=='flow'||!flowTab||s.active===undefined||s.active===''||s.active===flowTab,'原站列表',flowTab);}
 function pageReady(s,page){if(s.page!==page||!s.pageSize||!Number.isInteger(s.total))return false;const expected=Math.max(0,Math.min(s.pageSize,s.total-(page-1)*s.pageSize));const seq=s.headers.findIndex(h=>h.replace(/\s/g,'')==='序号');return s.rows.length===expected&&(s.kind==='flow'||seq<0||s.rows.every((r,i)=>Number(r[seq])===(page-1)*s.pageSize+i+1));}
 async function readPage(direction,kind='query',flowTab){await snapshot(kind);const moved=await waitSource({type:'page',direction,kind,flowTab},'pageRequested','原站翻页入口未就绪');const s=await waitSnapshot(kind,s=>pageReady(s,moved.pageRequested)&&(moved.unchanged||(s.probeToken===moved.token&&s.probeSettled)),'原站第'+moved.pageRequested+'页',flowTab);return kind==='flow'?{...s,flowTab}:s;}
 async function formOrder(id){
@@ -482,14 +482,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       if(whereKnown(await flowWhere())){
        // 认得出分类页显示状态：确认目标分类页在显示再读（点一次就等，不连点）
        await ensureFlowTab(msg.flowTab);
-       const snap=await snapshot('flow');
+       const snap=await snapshot('flow',msg.flowTab);
        checkFlowPage(snap,msg.flowTab);
        return {...snap,flowTab:msg.flowTab};
       }
       let ok=false;
       try{const out=await run({type:'flowTab',flowTab:msg.flowTab});ok=out.some(r=>r.flowSelected);flowStage('切到「'+msg.flowTab+'」：'+(ok?'已在该分类':out.some(r=>r.clicked)?'点了「'+msg.flowTab+'」，1.5 秒后直接读':'未确认，1.5 秒后直接读'));}catch(e){flowStage('切换分类出错：'+e.message);}
       if(!ok)await pause(1500);
-      const snap=await snapshot('flow');
+      const snap=await snapshot('flow',msg.flowTab);
       return {...snap,flowTab:msg.flowTab};
     }
     await navigate(msg.kind);
@@ -603,10 +603,10 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     const end=Date.now()+8000;
     while(Date.now()<end){
      await pause(350);
-     const s=await snapshot('flow');
+     const s=await snapshot('flow',msg.flowTab);
      if(s&&s.rowIds&&s.rowIds.join(',')!==clicked.before)return {...s,flowTab:msg.flowTab};
     }
-    const s=await snapshot('flow');
+    const s=await snapshot('flow',msg.flowTab);
     return {...s,flowTab:msg.flowTab,stale:true};
    }
    if(msg.type==='flowNext')return readPage('next','flow',msg.flowTab);
@@ -660,12 +660,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     if(msg.type==='syncFlowStatus'){
  const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
  const statuses={},failures=[];
+ const batchEnd=Date.now()+15*60*1000;let consecutive=0;
  try{
   // 只要原站有「快件查询」就能查；其他页面开没开、关没关都不管
   await navigate('query');
   await ensurePortalPage('query');
   try{await clearQueryTags();}catch{}
   for(let i=0;i<ids.length;i++){
+   if(Date.now()>batchEnd||consecutive>=8){for(let k=i;k<ids.length;k++)failures.push({id:ids[k],reason:'已停止（超时或连续失败）'});break;}
    const id=ids[i];
    let ok=false,lastErr='';
    for(let attempt=0;attempt<2&&!ok;attempt++){
@@ -681,7 +683,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       const results=out.filter(r=>r.rows&&r.probeToken===token&&r.probeSettled);
       if(results.length===1){
        const s=results[0];
-       if(s.total===1){const st=(SourceMapping.normalize(s)[0]||{}).status;if(st){statuses[id]=st;ok=true;}else lastErr='原站没有状态';}
+       if(s.total===1){const rec=SourceMapping.normalize(s)[0]||{};if(rec.id!==id){lastErr='回读单号不匹配（'+(rec.id||'空')+'）';}else{const st=rec.status;if(st){statuses[id]=st;ok=true;}else lastErr='原站没有状态';}}
        else lastErr='原站命中 '+(s.total??'?')+' 条';
        break;
       }
@@ -690,6 +692,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     }catch(e){lastErr=e.message;}
    }
    if(!ok)failures.push({id,reason:lastErr||'未查到'});
+   consecutive=ok?0:consecutive+1;
    try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||'',ok}).catch(()=>{});}catch{}
   }
  }finally{
@@ -703,6 +706,11 @@ if(msg.type==='statusPreflight'){
      let portal=await readPortal();
      if(!portal.service)throw Error('原站没有打开“京工飞鸿两校快件系统”标签。请先在门户打开它（点一次办理入口即可），再开始批量修改。');
      let closed=0;
+     // v1.0.0 修复：保存中绝不关调整单（0.9.195 的教训），先等门户保存完再关
+     if(portal.forms>0&&await portalSaving()){
+       try{await waitSaved();}catch{}
+       portal=await readPortal();
+     }
      for(let i=0;i<3&&portal.forms>0;i++){
       try{await run({type:'closeFormTab'});}catch{}
       await pause(120);
@@ -712,7 +720,7 @@ if(msg.type==='statusPreflight'){
      }
      return {service:true,closed,forms:portal.forms};
     }
-   if(msg.type==='cancelWrite'){preparedWrite=null;writeGeneration++;return {cancelled:true};}
+   if(msg.type==='cancelWrite'){preparedWrite=null;writeGeneration++;try{await run({type:'confirmCancel'});}catch{}return {cancelled:true};}
     if(msg.type==='prepare'){
      preparedWrite=null;const generation=++writeGeneration;
      const stage=text=>chrome.runtime.sendMessage({type:'writeStage',text}).catch(()=>{});

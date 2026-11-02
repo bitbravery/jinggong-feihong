@@ -14,7 +14,22 @@ function setStage(t){stageText=t;renderStage();}
 function tagText(){return batchTotal>1?(batchIndex+'/'+batchTotal+' '):'';}
 function setOrderState(id,text,kind){try{const el=document.querySelector('.cs-state[data-state="'+CSS.escape(String(id))+'"]');if(!el)return;el.textContent=text;el.dataset.kind=kind||'';}catch{}}
 function setOrderNote(id,note){try{const row=document.querySelector('.cs-row[data-row="'+CSS.escape(String(id))+'"]');if(row&&note)row.title=note;}catch{}}
-if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{if(!m)return;if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}if(busy&&m.type==='statusSync'){const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';const bar=$('bulkBar');if(bar){bar.max=m.total||1;bar.value=m.done||0;}const cnt=$('bulkCount');if(cnt)cnt.textContent='已回查 '+m.done+'/'+m.total+' 单';if(typeof statusBusy!=='undefined'&&statusBusy&&historyStatusMode==='fast'){const b=$('batchStatusCheck');if(b)b.textContent='快速查询中 '+m.done+'/'+m.total;}if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}}});
+if(globalThis.chrome?.runtime?.onMessage)chrome.runtime.onMessage.addListener(m=>{
+ if(!m)return;
+ if(m.type==='writeStage'){writeStageText=m.text;setStage((batchTotal>1&&batchLabel?batchLabel+'：':'')+m.text);const target=$('changeForm')?.querySelector('button[type="submit"]');if(target&&busy)target.textContent='正在提交…';return;}
+ if(busy&&m.type==='readStage'&&m.readId===activeReadId){readProgress.note=m.text;drawReadProgress();}
+ if(busy&&m.type==='flowStage'){readProgress.note=m.text;drawReadProgress();}
+ if(m.type==='standardStage'){$('bulkText').textContent='打开原站标准页面：'+m.text;const c=$('connection');if(c)c.textContent='打开原站标准页面：'+m.text;}
+ if(m.type==='statusSync'){
+  if(typeof statusBusy!=='undefined'&&statusBusy&&historyStatusMode==='fast'){const b=$('batchStatusCheck');if(b)b.textContent='快速查询中 '+m.done+'/'+m.total;}
+  if(busy){
+   const t=$('bulkText');if(t)t.textContent='正在核对实际状态 '+m.done+'/'+m.total+'…';
+   const bar=$('bulkBar');if(bar){bar.max=m.total||1;bar.value=m.done||0;}
+   const cnt=$('bulkCount');if(cnt)cnt.textContent='已回查 '+m.done+'/'+m.total+' 单';
+   if(m.id&&m.status){const hit=records.flow.find(o=>o.id===m.id&&o.flow==='已办');if(hit){hit.status=m.status;hit.statusSource='query';try{render();}catch{}}}
+  }
+ }
+});
 let readProgress={rows:0,total:null,page:0,pages:null,percent:null,started:0,note:''};
 function drawReadProgress(){const p=readProgress,seconds=p.started?((performance.now()-p.started)/1000).toFixed(1):'0.0';$('bulkText').textContent=`已查询 ${p.rows}/${p.total??'—'} 行，第 ${p.page}/${p.pages??'—'} 页，用时 ${seconds} 秒，进度 ${p.percent===null?'待计算':p.percent+'%'}${p.note?' · '+p.note:''}`;}
 let localPage=1, pendingCampus=null, bulkCancelled=false;
@@ -68,7 +83,7 @@ function setSnapshot(s){
 }
 async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.0')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
- if(busy)return;await requireComponent();lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
+ if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
    if(kind()==='query'&&(!s.rows||s.rows.length===0)){
      const keep=records.query.length>0;
@@ -97,6 +112,7 @@ function render(listOnly=false){
  const matching=filtered(),localPages=Math.max(1,Math.ceil(matching.length/LOCAL_PAGE_SIZE));localPage=Math.min(localPage,localPages);const visible=matching.slice((localPage-1)*LOCAL_PAGE_SIZE,localPage*LOCAL_PAGE_SIZE),eligible=visible.filter(o=>!o.duplicateOrder),ids=new Set(matching.filter(o=>!o.duplicateOrder).map(o=>o.id));selected=new Set([...selected].filter(id=>ids.has(id)));
  const s=snapshots[kind()];
  $('scopeFooter').textContent='原站数据 · '+(s?.bulk?(s.complete?'所有页面读取批次':'尚未读完的批次'):'当前原站页')+' · 收件人学号/工号原站未提供';
+ if(currentView==='flow'&&s)$('scopeFooter').textContent='流程数据 · 已读取 '+s.rows.length+' 条'+(s.limited?'（前 '+s.pagesRead+' 页）':'');
  const duplicateRows=orders().filter(o=>o.duplicateOrder).length,duplicateIds=new Set(orders().filter(o=>o.duplicateOrder).map(o=>o.id)).size;
  $('prevPage').hidden=flow||!!s?.bulk;$('nextPage').hidden=flow||!!s?.bulk;$('sourcePage').hidden=flow||!!s?.bulk;
  $('readSource').disabled=busy;$('readRecent').disabled=busy;$('readAll').disabled=busy;
@@ -108,6 +124,7 @@ function render(listOnly=false){
  const connectionDetail=s?`${s.bulk?(s.complete?'近一个月全部页面读取完成':'读取未完成，以下仅为已读部分'):'原站当前页'}：已读取 ${s.rows.length} 行 / 原站范围 ${s.total??'未识别'} 行。${s.bulk?'已读 '+s.pagesRead+' / '+s.pageCount+' 页。':''}${duplicateIds?'有 '+duplicateIds+' 个重复单号，涉及 '+duplicateRows+' 行，全部保留并禁止修改。':''}读取时间 ${formatTime(new Date(s.readAt))}（北京时间）。${s.bulk?(s.dateRange?'下单时间 '+s.dateRange.from+' 至 '+s.dateRange.to+'。分批读取期间数据可能更新。':'分批读取期间数据可能更新；可重新读取刷新。'):'当前仅本页；一键读取近一个月可自动读取该时段所有状态、所有页面。'}`:'尚未读取。可读取当前页，或一键读取近一个月所有状态与页面。';
  $('connection').title=lastReadError||connectionDetail;
  $('connection').textContent=lastReadError?('读取未完成：'+(s?.bulk&&!s.complete?'仅已读 '+s.rows.length+'/'+(s.total??'—')+' 行 · ':'')+lastReadError):s?`${s.bulk?(s.complete?'近一个月读取完成':'未读完，仅显示已读部分'):'当前页读取完成'} · ${s.rows.length}/${s.total??'—'} 行${s.bulk?' · '+s.pagesRead+'/'+s.pageCount+' 页':''} · ${formatTime(new Date(s.readAt))}${s.dateRange?' · '+s.dateRange.from+' 至 '+s.dateRange.to:''}${duplicateIds?' · '+duplicateIds+' 个重复单号（禁改）':''}`:'尚未读取';
+ if(currentView==='flow'&&!lastReadError&&s)$('connection').textContent='流程已读取 '+s.rows.length+' 条'+(s.limited?'（前 '+s.pagesRead+' 页，可继续读取）':'');
  if(!listOnly){
  $('overview').innerHTML=CampusPerspective.columns(campus).map(c=>`<button aria-pressed="${activeColumns.has(c.key)}" class="status-tab ${activeColumns.has(c.key)?'active':''}" data-column="${c.key}"><span>${E(c.label)}</span><b>${orders().filter(o=>CampusPerspective.matchesColumn(o,campus,c,mappings)).length}</b></button>`).join('');
  $('flowTabs').innerHTML=['待办','已办'].map(t=>`<button class="button ${flowTab===t?'primary':''}" data-flow="${t}">${t}</button>`).join('')+(flowTab==='已办'?`<button class="button flow-sync-tab" data-sync="1">实际状态回查</button>`:'');
@@ -127,13 +144,16 @@ function emptyRow(){
  return '<tr><td colspan="8" class="empty">暂无已读取的匹配快件。请先读取原站对应列表。</td></tr>';
 }
 function view(v){const sub=document.querySelector('.header-subtitle');if(sub)sub.hidden=false;const HINTS={flow:'待办/已办流程读取与批量通过、退回。',orders:'查询、分类、改状态，在这里一次完成。',settings:'维护寄件楼宇 → 校区区域对照；只影响工作台筛选，不改原站。',history:'本地保存最近一个月的改动记录；可核对原站状态或改回。',tips:'值班注意事项、主要功能、改状态要点和常见问题。'};const hintEl=document.getElementById('pageHint');if(hintEl)hintEl.textContent=HINTS[v]||'';const connEl=document.getElementById('connection');if(connEl)connEl.hidden=!['orders','flow'].includes(v);if(v==='history'){try{const rows=document.getElementById('historyRows');if(rows)rows.scrollTop=0;const sec=document.getElementById('history');if(sec)sec.scrollTop=0;}catch{}}const bar=$('selectionBar');if(bar)bar.hidden=true;if(document.body&&document.body.classList)document.body.classList.remove('has-selection-bar');if(!busy)$('bulkProgress').hidden=true;currentView=v;localPage=1;selected.clear();activeColumn='all';activeColumns=new Set(['all']);$('search').value='';for(const id of ['direction','identity','region'])$(id).value='all';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));$('settings').hidden=v!=='settings';$('history').hidden=v!=='history';$('tips').hidden=v!=='tips';$('work').hidden=!['orders','flow'].includes(v);const work=['orders','flow'].includes(v),query=v==='orders';$('readSource').hidden=!work;$('readFlows').hidden=true;$('diagnose').hidden=v!=='flow';$('readSource').textContent='读取当前页';$('flowPagesWrap').hidden=v!=='flow';$('readRecent').hidden=v==='flow'||!work;$('readAll').hidden=v==='flow'||!work;document.querySelector('.read-range').hidden=v==='flow'||!work;if($('statusRow'))$('statusRow').hidden=(v==='flow');$('pageTitle').textContent={flow:'流程办理',orders:'快件查询及状态调整',settings:'楼宇与区域',history:'状态修改历史',tips:'重要提示'}[v];if(v==='settings')renderMappings();else if(v==='history')renderHistory();else render();}
-function openChange(ids){pending=orders().filter(o=>ids.includes(o.id)&&!o.duplicateOrder);if(!pending.length)return;
+function openChange(ids){pending=orders().filter(o=>ids.includes(o.id)&&!o.duplicateOrder&&(currentView!=='flow'||o.flow===flowTab));if(!pending.length)return;
  const pendingFlow=pending.filter(o=>o.flow==='待办');
  if(pendingFlow.length){toast('选中的 '+pendingFlow.length+' 单还在“待办”：请先在原站「批量处理 → 通过」，变成已办并进入良乡申请寄件后，才能改物流状态。');return;}writePhase='idle';changeCancelled=false;writeStarted=performance.now();if(!stageTimer)stageTimer=setInterval(renderStage,500);setStage('尚未提交，可随时取消。');$('cancelChange').textContent='取消';$('cancelChange').disabled=false;$('closeChange').disabled=false;$('changeSummary').innerHTML=pending.map(o=>'<div class="cs-row" data-row="'+E(o.id)+'">'+E(o.id)+' · '+E(o.sender)+' → '+E(o.receiver)+' · '+E(o.status)+'<span class="cs-state" data-state="'+E(o.id)+'">待处理</span></div>').join('');const pick=$('targetStatus');pick.dataset.value='';pick.dataset.selected='0';pick.style.setProperty('--i','0');pick.querySelectorAll('input[type=radio]').forEach(r=>{r.checked=false;});$('changeReason').value='';$('changeForm').querySelector('button[type="submit"]').disabled=!FeiHongWritePolicy.allowed(pending);$('batchCount').textContent=pending.length;$('changeDialog').showModal();}
 async function submit(e){
  e.preventDefault();if(busy||!pending.length)return;if(statusBusy){toast('正在批量查看原站状态（'+Math.min(statusDone+1,statusTotal)+'/'+statusTotal+'），原站一次只能做一件事：请等它结束后再提交修改。');return;}if(!FeiHongWritePolicy.allowed(pending)){toast('所选记录含无效单号或重复单，禁止提交。');return;}const target=$('targetStatus').dataset.value||'';if(!statuses.includes(target)){toast('请先选择目标状态，再提交。');const first=$('targetStatus').querySelector('input[type=radio]');if(first)first.focus();return;}
  const targets=pending.filter(o=>o.status!==target);if(!targets.length){toast('目标与当前状态相同，无需提交。');return;}
- busy=true;changeCancelled=false;writePhase='preparing';setStage('正在核对原站；此阶段可以取消，取消后不会提交。');const pre=await request({type:'statusPreflight'});if(pre&&pre.closed)toast('已关闭残留的“物流状态调整单” '+pre.closed+' 张。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
+ busy=true;changeCancelled=false;writePhase='preparing';setStage('正在核对原站；此阶段可以取消，取消后不会提交。');let pre=null;
+ try{pre=await request({type:'statusPreflight'});}
+ catch(err){busy=false;writePhase='idle';changeCancelled=false;if(stageTimer){clearInterval(stageTimer);stageTimer=null;}$('closeChange').disabled=false;$('cancelChange').disabled=false;try{$('changeDialog').close();}catch{}render();toast('开始批量修改前检查原站失败：'+err.message,12000);return;}
+ if(pre&&pre.closed)toast('已关闭残留的“物流状态调整单” '+pre.closed+' 张。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
  const batchStartedAt=performance.now(),batchId='b'+Date.now();$('changeBatchSummary').textContent='正在提交申请，请耐心等待；批量修改期间请勿操作原站或扩展（需要人工清理时按提示操作）。';
  let doneCount=0;const failures=[];let consecutiveFails=0;const batchRows=[];
  try{
@@ -315,7 +335,7 @@ function flowProgress(p){
  return {target,pagesTarget,percent};
 }
 async function readFlows(pages=5){
- if(busy)return;await requireComponent();busy=true;bulkCancelled=false;lastReadError='';localPage=1;selected.clear();
+ if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}busy=true;bulkCancelled=false;lastReadError='';localPage=1;selected.clear();
  const started=performance.now();readProgress={rows:0,total:null,page:0,pages:null,percent:null,started,note:'读取'+flowTab};
  $('bulkProgress').hidden=false;$('cancelBulk').disabled=false;$('bulkBar').removeAttribute('value');$('readFlows').textContent='正在读取…';drawReadProgress();render();
  const timer=setInterval(drawReadProgress,100);
@@ -331,14 +351,14 @@ async function readFlows(pages=5){
   const fresh=parts.flatMap(p=>SourceMapping.normalize(p));records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...fresh];
   // v0.9.206：原站把“已办”的状态一律写成订单申请，必须回「快件查询」核对真实状态
 
-  snapshots.flow={kind:'flow',bulk:true,complete:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'待办 / 已办 全部页面'};
+  snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'流程（前 '+pages+' 页）'};
   readProgress.percent=100;readProgress.rows=records.flow.length;readProgress.total=records.flow.length;$('bulkBar').value=100;
   try{await request({type:'flowFirstPage'});}catch{}
  $('bulkText').textContent='已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），当前共 '+records.flow.length+' 条';
   $('bulkCount').textContent='待办 '+tally('待办')+' 条 · 已办 '+tally('已办')+' 条';
   toast('已读取“'+flowTab+'”'+fresh.length+' 条（前 '+pages+' 页），用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒。');refreshNotices();
  }catch(e){
-  if(e.partial&&e.partial.length){records.flow=e.partial.flatMap(p=>SourceMapping.normalize(p));snapshots.flow={kind:'flow',bulk:true,complete:false,page:1,total:records.flow.length,pageSize:null,rows:e.partial.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:e.partial.reduce((n,p)=>n+p.pagesRead,0),pageCount:e.partial.reduce((n,p)=>n+p.pageCount,0),scope:'待办 / 已办（未读完）'};}
+  if(e.partial&&e.partial.length){records.flow=[...records.flow.filter(o=>o.flow!==flowTab),...e.partial.flatMap(p=>SourceMapping.normalize(p))];snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,total:records.flow.length,pageSize:null,rows:e.partial.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:e.partial.reduce((n,p)=>n+p.pagesRead,0),pageCount:e.partial.reduce((n,p)=>n+p.pageCount,0),scope:'流程（未读完）'};}
   lastReadError=e.message;$('bulkText').textContent=e.message;$('bulkCount').textContent='流程读取未完成';
   toast(e.message);
  }finally{clearInterval(timer);$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readFlows').textContent='读取全部流程';render();}
@@ -662,27 +682,43 @@ async function pumpStatus(){
   if(historyStatusMode==='fast'){
    // 改状态/改回/读取进行中时不插队：原站一次只做一件事。
    while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
-   // 快速查询：整批交给后台一次打开「快件查询」逐单查，最后统一关查询（和已办实际状态回查同一条路）
-   const items=statusQueue.slice();
-   const ids=[...new Set(items.map(x=>x.row.id).filter(id=>/^JGKD\d+$/.test(id)))];
-   if(!ids.length){statusQueue.length=0;return;}
-   if(btn)btn.textContent='快速查询中 0/'+ids.length;
-   const got={},fails=[];
-   for(let i=0;i<ids.length;i+=200){
-    if(btn)btn.textContent='快速查询中 '+Math.min(i+200,ids.length)+'/'+ids.length;
-    const r=await request({type:'syncFlowStatus',ids:ids.slice(i,i+200)});
-    Object.assign(got,(r&&r.statuses)||{});
-    if(r&&Array.isArray(r.failures))fails.push(...r.failures);
+   let totalIds=0,totalGot=0,totalFail=0;
+   while(statusQueue.length){
+    const items=statusQueue.splice(0);
+    const ids=[...new Set(items.map(x=>x.row.id).filter(id=>/^JGKD\d+$/.test(id)))];
+    if(!ids.length){continue;}
+    if(btn)btn.textContent='快速查询中 0/'+ids.length;
+    const got={},fails=[];
+    try{
+     for(let i=0;i<ids.length;i+=200){
+      if(btn)btn.textContent='快速查询中 '+Math.min(i+200,ids.length)+'/'+ids.length;
+      const r=await request({type:'syncFlowStatus',ids:ids.slice(i,i+200)});
+      Object.assign(got,(r&&r.statuses)||{});
+      if(r&&Array.isArray(r.failures))fails.push(...r.failures);
+     }
+    }catch(e){
+     // 已经查到的先落盘，失败的按原因标出（不整批丢弃）
+     for(const it of items){
+      if(got[it.row.id])it.row.currentStatus=got[it.row.id];
+      else it.row.currentStatus='取不到（'+String(e.message||'快速查询失败').slice(0,40)+'）';
+      it.row.via='fast';it.row.checkedAt=formatTime(new Date());
+      historyQueued.delete(it.iso);
+     }
+     statusDone+=items.length;totalIds+=ids.length;totalGot+=Object.keys(got).length;totalFail+=(ids.length-Object.keys(got).length);
+     save();renderHistory();
+     continue;
+    }
+    const failMap=new Map(fails.map(f=>[f.id,f.reason]));
+    for(const it of items){
+     const st=got[it.row.id];
+     if(st)it.row.currentStatus=st;else it.row.currentStatus='取不到（'+(failMap.get(it.row.id)||'快速查询未返回')+'）';
+     it.row.via='fast';it.row.checkedAt=formatTime(new Date());
+     historyQueued.delete(it.iso);
+    }
+    statusDone+=items.length;totalIds+=ids.length;totalGot+=Object.keys(got).length;totalFail+=(ids.length-Object.keys(got).length);
+    save();renderHistory();
    }
-   const failMap=new Map(fails.map(f=>[f.id,f.reason]));
-   for(const it of items){
-    const st=got[it.row.id];
-    if(st)it.row.currentStatus=st;else it.row.currentStatus='取不到（'+(failMap.get(it.row.id)||'快速查询未返回')+'）';
-    it.row.via='fast';it.row.checkedAt=formatTime(new Date());
-   }
-   statusDone+=items.length;statusQueue.length=0;historyQueued.clear();
-   save();renderHistory();
-   toast('快速查询完成：查到 '+Object.keys(got).length+'/'+ids.length+' 单'+(fails.length?'，'+fails.length+' 单没查到（可稍后再试）':'')+'。',fails.length?10000:5000);
+   toast('快速查询完成：查到 '+totalGot+'/'+totalIds+' 单'+(totalFail?'，'+totalFail+' 单没查到（可稍后再试）':'')+'。',totalFail?10000:5000);
    return;
   }
   while(statusQueue.length){
@@ -703,7 +739,12 @@ async function pumpStatus(){
    statusQueue.shift();statusDone++;historyRunning='';
    save();renderHistory();
   }
- }catch(e){toast('快速查询失败：'+e.message,10000);statusQueue.length=0;}
+ }catch(e){
+  toast('查询原站状态失败：'+e.message,10000);
+  // 出错时把还没查的行标出来，不要静默丢弃队列
+  while(statusQueue.length){const it=statusQueue.shift();it.row.currentStatus='取不到（'+String(e.message||'查询失败').slice(0,40)+'）';it.row.via=historyStatusMode;it.row.checkedAt=formatTime(new Date());historyQueued.delete(it.iso);}
+  try{save();renderHistory();}catch{}
+ }
  finally{
   statusBusy=false;historyRunning='';historyQueued.clear();historySeq.clear();historyTotal=0;
   try{renderHistory();}catch{}

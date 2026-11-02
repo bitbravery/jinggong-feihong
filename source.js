@@ -26,7 +26,8 @@ function sourceAction(command){
  }
  const text=e=>(e?.innerText||e?.textContent||'').trim();
  // v0.9.219：只报告“本帧对应的门户标签是不是当前前台”，绝不点标签；切标签全部交给后台按顺序做
- const fhTabHere=want=>{try{const d=window.top.document;const tabs=Array.from(d.querySelectorAll('.mini-tab'));if(!tabs.length)return true;const norm=s=>String(s||'').replace(/\s+/g,'');const act=tabs.find(t=>t.classList.contains('mini-tab-active'));if(!act)return true;const a=norm(text(act));return want instanceof RegExp?want.test(a):a.includes(norm(want));}catch{return true;}};
+ // v1.0.0：同时确认本帧真的显示着（隐藏的第二个表单 iframe 不许动手，避免同一单点两次提交）
+ const fhTabHere=want=>{try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!fr.height||!fr.width)return false;}const d=window.top.document;const tabs=Array.from(d.querySelectorAll('.mini-tab'));if(!tabs.length)return true;const norm=s=>String(s||'').replace(/\s+/g,'');const act=tabs.find(t=>t.classList.contains('mini-tab-active'));if(!act)return true;const a=norm(text(act));return want instanceof RegExp?want.test(a):a.includes(norm(want));}catch{return true;}};
   // 人工验证：填完单号后在表单空白处单击一次即可触发联动，不需要回车
   const fhPoke=()=>{try{
    const box=document.getElementById('DH$text');
@@ -303,7 +304,7 @@ function sourceAction(command){
     const notices=inner.map(el=>{
       const t=text(el).replace(/\s+/g,' ').trim();
       const timeMatch=t.match(/发送时间[:：]?\s*([0-9]{1,2}月[0-9]{1,2}日\s*[0-9]{1,2}:[0-9]{2}|[0-9\-\/ :]{6,20})/);
-      const body=t.replace(/^消息提醒/,'').replace(/发送时间[:：]?.*$/,'').replace(/查看详情|详情/g,'').replace(/s+/g,' ').trim();
+      const body=t.replace(/^消息提醒/,'').replace(/发送时间[:：]?.*$/,'').replace(/查看详情|详情/g,'').replace(/\s+/g,' ').trim();
       const idMatch=body.match(/JGKD\d+/);
       return {body,time:timeMatch?timeMatch[1].trim():'',id:idMatch?idMatch[0]:''};
     }).filter(n=>n.body);
@@ -336,7 +337,7 @@ function sourceAction(command){
       return /打印|print|dayin/.test(label)&&el.getBoundingClientRect().height>0;
     });
     cands=cands.filter(el=>!cands.some(o=>o!==el&&el.contains(o)));
-    if(!cands.length)return {waiting:true,candidates:0,sample:(document.body.innerText||'').slice(0,0)||'none'};
+    if(!cands.length)return {waiting:true,candidates:0,sample:(document.body.innerText||'').replace(/\s+/g,' ').trim().slice(0,120)||'none'};
     // 优先选屏幕上方、靠右的（工具栏区域）
     cands.sort((a,b)=>{const ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect();return (ra.top-rb.top)||(rb.left-ra.left);});
     cands[0].click();return {printRequested:true,candidates:cands.length};
@@ -638,6 +639,9 @@ function sourceAction(command){
      if(!retry||retry.token!==command.token)retry=window.__fhDirtyRetry={token:command.token,count:0};
      const text=dirtyAlert.text.replace(/^提示/,'').replace(/确定$/,'').trim().slice(0,90);
      fhDismiss(dirtyAlert.box);
+     // v1.0.0：重提前先核对当前表单是不是本单，避免把别的单再提交一次
+     let dhNow='';try{dhNow=(document.getElementById('DH$text')?.value||'').trim();}catch{}
+     if(command.order&&command.order.id&&dhNow&&dhNow!==command.order.id)return {error:'原站提示数据不完整，但当前表单里是「'+dhNow+'」不是本单；为避免提交错单，未重新提交，已跳过本单。'};
      if(retry.count>=1)return {error:'原站提示「'+text+'」；已重新提交一次仍被拦截，本单未提交，继续下一单。'};
      retry.count++;
      let send=null;
@@ -732,6 +736,16 @@ function sourceAction(command){
   if(command.type==='confirmResidue'){
    const hit=fhDialogs();
    return {residue:hit.length,diag:hit.length?fhDiag(fhOkBtn(hit[0]),false):''};
+  }
+  if(command.type==='confirmCancel'){
+   // 取消批量后：如果原站还停着「您确定要提交吗」的确认框，点“取消”关掉，避免之后误点确定真的提交
+   const boxes=Array.from(document.querySelectorAll('.mini-messagebox,.mini-window,.mini-panel')).filter(b=>fhVis(b)&&/您确定要提交吗/.test(text(b)));
+   let n=0;
+   for(const box of boxes){
+    const cancel=Array.from(box.querySelectorAll('button,a,span')).find(e=>/取\s*消/.test(text(e))&&fhVis(e));
+    if(cancel){try{cancel.click();n++;}catch{}}
+   }
+   return {cancelledDialogs:n};
   }
   if(command.type==='confirmDismiss'){
    const hit=fhDialogs();

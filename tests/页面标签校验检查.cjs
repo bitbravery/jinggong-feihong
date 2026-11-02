@@ -29,6 +29,6 @@ assert(worker.includes("ensurePortalPage('form')"),'查看原站状态读表单�
 assert(live.includes('let changeCancelled=false'),'取消标记');
 assert(/async function cancelChange\(\)\{[\s\S]{0,600}writePhase==='submitted'/.test(live),'提交阶段也能取消');
 assert(live.includes("if(changeCancelled){setStage('已取消，剩余单未执行');break;}"),'每单开始前检查取消');
-assert(worker.includes("if(msg.type==='cancelWrite'){preparedWrite=null;writeGeneration++;return {cancelled:true};}"),'取消作废准备令牌');
+assert(worker.includes("if(msg.type==='cancelWrite'){preparedWrite=null;writeGeneration++;")&&worker.includes("run({type:'confirmCancel'})"),'取消作废准备令牌并清理残留确认框');
 assert(/async function confirmPatiently\(command,label,onTick,alt,stage,generation\)/.test(worker),'等待确认可被取消打断');
 console.log('通过：每个操作前校验门户标签（等0.1秒→关残留调整单→切回正确页）；批量改状态可随时取消。');

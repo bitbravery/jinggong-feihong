@@ -12,7 +12,7 @@ const block=w.slice(w.indexOf("msg.type==='statusPreflight'"),w.indexOf("msg.typ
 assert(/for\(let i=0;i<3&&portal\.forms>0;i\+\+\)/.test(block),'残留调整单最多关 3 次');
 assert(block.includes("run({type:'closeFormTab'})"),'要真的点关闭');
 // 3) 批量开始前调用
-assert(/const pre=await request\(\{type:'statusPreflight'\}\)/.test(l),'批量开始前要执行前置检查');
+assert(/pre=await request\(\{type:'statusPreflight'\}\)/.test(l),'批量开始前要执行前置检查');
 assert(/已关闭残留的“物流状态调整单”/.test(l),'关掉了要提示用户');
 // 4) 串行集合包含它
 assert(w.includes("'statusPreflight','read'"),'前置检查要纳入原站串行队列');

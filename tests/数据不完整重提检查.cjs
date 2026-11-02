@@ -9,7 +9,7 @@ const html=fs.readFileSync(__dirname+'/../index.html','utf8');
 assert(/const fhDirtyAlert=/.test(src)&&/数据不完整\|请检查后重新提交/.test(src),'要能识别数据不完整提示');
 
 // 2) 点确定后重新点提交，而不是直接判失败
-assert(/fhDismiss\(dirtyAlert\.box\);\n\s*if\(retry\.count>=1\)/.test(src),'先点确定关闭提示');
+assert(/fhDismiss\(dirtyAlert\.box\);[\s\S]{0,300}if\(retry\.count>=1\)/.test(src),'先点确定关闭提示（并核对表单单号）');
 assert(/retry\.count\+\+;/.test(src),'同一单只允许重提一次');
 assert(/document\.getElementById\('sendBtn'\)/.test(src),'重提要按右上角“提交”');
 assert(/try\{send\.click\(\);\}catch\{\}/.test(src),'重提动作是再点一次提交');
