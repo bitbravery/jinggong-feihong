@@ -313,10 +313,17 @@ function sourceAction(command){
   if(command.type==='openDetail'){
     const p=location.pathname;
     if(!/List\.htm$/i.test(p))return null;
+    // v1.0.17：隐藏的分类页（待办/已办/抄送三张页面只显示一张）不动手，避免同一单开两个详情
+    try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return null;}}catch{}
     const id=String(command.id||'');
     const norm=s=>String(s||'').replace(/\s+/g,'');
     const rows=Array.from(document.querySelectorAll('tr[id^="line_"],tr.mini-grid-row'));
-    let hit=rows.find(r=>norm(text(r)).includes(id))||null;
+    // 完整单号且前后不紧挨字母数字（…1 不会命中 …12）；命中多行就停
+    const re=id?new RegExp('(^|[^A-Za-z0-9])'+id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Za-z0-9])'):null;
+    // 用原始行文字（单元格之间有空白分隔）；去掉空白后单号会和相邻格的数字粘在一起
+    const full=re?rows.filter(r=>re.test(text(r))):[];
+    if(full.length>1)return {error:'按完整单号匹配到 '+full.length+' 行，无法唯一确定 '+id+'，已停止（避免打开错单）。'};
+    let hit=full[0]||null;
     if(!hit&&id.length>=6){
       const tail=id.slice(-6);
       const cands=rows.filter(r=>norm(text(r)).includes(tail));
@@ -796,6 +803,8 @@ function sourceAction(command){
  }
  if(command.type==='closeQuery'){
    if(!location.pathname.endsWith('/queryResult.htm'))return null;
+   // v1.0.17：快件查询不在前台时（隐藏帧里元素尺寸都是 0），什么都点不到，不能报“已关闭”
+   if(!fhTabHere(/快件查询/))return {wrongTab:true};
    const vis=el=>{try{const r=el.getBoundingClientRect();return r.height>0&&r.width>0;}catch{return false}};
    const shoot=el=>{for(const t of ['mousedown','mouseup','click']){try{el.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window}));}catch{try{el.click();}catch{}}}};
    // v1.0.0：条件行的红色错号就是原站的 delete_search 链接（图标可能没有文字，不能靠“×”文字找）。
@@ -847,7 +856,9 @@ function sourceAction(command){
      count:rows.length,
      inputs:first?first.querySelectorAll('input[type=checkbox]').length:0,
      boxes:first?first.querySelectorAll('.mini-checkbox,[class*="checkbox"]').length:0,
-     html:first?String(first.outerHTML||'').replace(/\s+/g,' ').slice(0,600):''};
+     // v1.0.17：诊断会被复制外发，只报结构（格数、勾选控件类名），不带行内容（姓名、电话、单号）
+     cells:first?first.children.length:0,
+     html:first?Array.from(first.querySelectorAll('input,.mini-checkbox,[class*="checkbox"],.mini-grid-radio-mask')).slice(0,4).map(e=>String(e.tagName||'').toLowerCase()+(e.className?'.'+String(e.className).trim().split(/\s+/).slice(0,2).join('.'):'')).join(' '):''};
  }
  if(command.type==='flowFrames'){
    const p=location.pathname;
@@ -861,7 +872,8 @@ function sourceAction(command){
    }
    const summary=text(document.body).match(/每页\s*\d+\s*条[，,]?\s*共\s*(\d+)\s*条/);
    const de=document.documentElement||{};
-   return {frame:true,path:p,total:summary?Number(summary[1]):null,count:rows.length,first:rows[0]?String(text(rows[0].children[2])||''):'',size:[de.clientWidth,de.clientHeight]};
+   const mask=v=>{v=String(v||'');return v.length>8?v.slice(0,4)+'…'+v.slice(-4):(v?'…':'');};
+   return {frame:true,path:p,total:summary?Number(summary[1]):null,count:rows.length,first:rows[0]?mask(text(rows[0].children[2])):'',size:[de.clientWidth,de.clientHeight]};
  }
   if(command.type==='flowDate'){
     const p=location.pathname;
@@ -934,7 +946,7 @@ function sourceAction(command){
      const re=new RegExp('(^|[^A-Za-z0-9])'+id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Za-z0-9])');
      const cands=rows.filter(r=>re.test(text(r)));
      if(cands.length>1)return {error:'按完整单号匹配到 '+cands.length+' 行，无法唯一确定 '+id+'，未勾选'};
-     if(!cands.length)return {waiting:true,error:'原站当前列表没有完整单号 '+id+' 的行，未勾选',sample:rows.slice(0,2).map(r=>text(r).replace(/\s+/g,' ').slice(0,60))};
+     if(!cands.length)return {waiting:true,error:'原站当前列表没有完整单号 '+id+' 的行，未勾选（列表共 '+rows.length+' 行）',sample:['列表共 '+rows.length+' 行']};
      hit=cands[0];
    }
    // 没有单号时才按寄件人+收件人找，且必须唯一；不再按行号兜底（行号来自扩展本地列表，与原站行序无关）
@@ -944,7 +956,7 @@ function sourceAction(command){
      if(cands.length===1){hit=cands[0];via='寄件人+收件人';}
      else if(cands.length>1)return {error:'按姓名匹配到 '+cands.length+' 行，无法唯一确定'};
    }
-   if(!hit)return {waiting:true,sample:rows.slice(0,2).map(r=>text(r).replace(/\s+/g,' ').slice(0,60))};
+   if(!hit)return {waiting:true,sample:['列表共 '+rows.length+' 行']};
    const cell=hit.querySelector('td.mini-checkcolumn')||hit.querySelector('td');
    const mask=cell?cell.querySelector('.mini-grid-radio-mask'):null;
    const input=cell?cell.querySelector('input[type=checkbox]'):hit.querySelector('input[type=checkbox]');
@@ -1087,7 +1099,10 @@ function sourceAction(command){
       return [];
     };
     const bodyRows=pickRows();
-   if(kind==='flow'){const h=bodyRows.length?(bodyRows[0].offsetHeight===undefined?1:bodyRows[0].offsetHeight):(document.querySelector('body')?1:1);if(!(h>0))return {hiddenFrame:true,path,size:[0,0]};}
+   if(kind==='flow'){
+    // v1.0.17：0 行的分类页无法靠行高判断是否隐藏，先看所在框架高度（现场诊断确认显示中的分类页框架高度 >0，其余为 0）
+    try{if(window.frameElement){const fr=window.frameElement.getBoundingClientRect();if(!(fr.height>0))return {hiddenFrame:true,path,size:[0,0]};}}catch{}
+    const h=bodyRows.length?(bodyRows[0].offsetHeight===undefined?1:bodyRows[0].offsetHeight):(document.querySelector('body')?1:1);if(!(h>0))return {hiddenFrame:true,path,size:[0,0]};}
     const rows=bodyRows.map(r=>Array.from(r.children).map(text));
    if(rows.some(row=>row.length!==headers.length))return {error:'表头与数据列数不一致，停止读取，防止字段错位。'};
    const pager=Array.from(document.querySelectorAll('.mini-pager')).map(text).join(' ');

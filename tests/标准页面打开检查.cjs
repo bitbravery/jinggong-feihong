@@ -23,7 +23,8 @@ assert(live.includes('原站标准页面已打开'),'成功要有提示');
 // 3) 后台编排
 assert(/PORTAL_OPS=new Set\(\['openStandardPages'/.test(worker),'openStandardPages 必须进串行队列 PORTAL_OPS');
 assert(/async function openStandardPages\(returnTabId\)/.test(worker),'后台要有编排函数');
-assert(/portal\.forms>0[\s\S]{0,400}90000/.test(worker),'正在保存的调整单要先等它存完（上限 90 秒）');
+// v1.0.17：只在原站真在保存时等（复用 waitSaved，上限 90 秒）；没在保存的残留调整单由“关闭其他标签”直接关
+assert(/portal\.forms>0&&await portalSaving\(\)[\s\S]{0,200}waitSaved\(/.test(worker)&&/const end=Date\.now\(\)\+90000;\s*while\(Date\.now\(\)<end&&await portalSaving\(\)\)/.test(worker),'正在保存的调整单要先等它存完（上限 90 秒）');
 assert(worker.includes("type:'tabCloseAll',keep:'工作台'"),'第 0 步关掉其他标签、只留工作台');
 assert(worker.includes('90 秒内没有保存完'),'等调整单超时要停止并提示');
 assert(worker.includes('activatePortalTab'),'切标签后要确认真的切到前台再操作');

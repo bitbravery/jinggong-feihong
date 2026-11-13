@@ -22,8 +22,9 @@ ctx.fakeRun=async c=>{if(c.type==='formActive')return [{formActive:true}];
  // 联动前：联系人为空、当前状态是表单默认的“订单申请”
  if(c.type==='readForm'){const linked=t>=linkAfter;return [{dh:ID,fields:{DH:ID,JJRXM:linked?'张三':'',SJRXM:linked?'李四':''},current:linked?current:'订单申请'}];}
  if(c.type==='armSubmission')return [{armed:true}];
- if(c.type==='submitBare'){submitCmd=c;return [{submitted:true}];}
- if(c.type==='confirmSubmit')return [{confirmed:true}];
+ // v1.0.17：改回与批量改状态同一判据——“提交成功”且调整单标签自动关闭
+ if(c.type==='submitBare'){submitCmd=c;forms=0;return [{submitted:true}];}
+ if(c.type==='confirmSubmit')return [{confirmed:true,via:'toast'}];
  return [];
 };
 vm.runInContext('run=fakeRun;',ctx);

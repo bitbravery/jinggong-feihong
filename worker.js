@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.17';
+const COMPONENT_VERSION = '1.0.18';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -191,15 +191,11 @@ async function openStandardPages(returnTabId){
   if(!portal)throw Error('没有读到门户标签栏，请回到学校门户页面，点一次红色飞鸿图标重新连接。');
   if(!portal.tabs.some(t=>/工作台/.test(t)))throw Error('门户里没有“工作台”标签（当前：'+(portal.tabs.join('、')||'无')+'），请先回到门户首页。');
   // 第 0 步：有正在保存的调整单时先等它结束，避免关标签把门户卡在“加载中”（用户要求：调整单先等它存完）
-  if(portal.forms>0){
-   await standardStage('原站还有“物流状态调整单”，先等它保存完成');
-   const end=Date.now()+90000;
-   while(Date.now()<end){
-    await pause(1000);
-    portal=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];
-    if(!portal||portal.forms===0)break;
-   }
-   if(portal&&portal.forms>0)throw Error('原站“物流状态调整单”90 秒内没有保存完。为避免门户卡死，已停止；请到原站确认这一单处理完后再点“打开原站标准页面”。');
+  // v1.0.17：只有原站真在保存（加载中）才等；没在保存的残留调整单由下面“关闭其他标签”直接关掉，不再白等 90 秒
+  if(portal.forms>0&&await portalSaving()){
+   await standardStage('原站“物流状态调整单”正在保存，先等它保存完成');
+   try{await waitSaved(standardStage);}
+   catch{throw Error('原站“物流状态调整单”90 秒内没有保存完。为避免门户卡死，已停止；请到原站确认这一单处理完后再点“打开原站标准页面”。');}
   }
   await standardStage('关闭原站其他标签，只留“工作台”');
   for(let i=0;i<10;i++){
@@ -263,6 +259,7 @@ async function openStandardPages(returnTabId){
 
 async function framePaths(){try{const out=await run({type:'frameReport'});return out.filter(r=>r&&r.path).map(r=>r.path);}catch{return [];}}
 let flowCancelled=false;
+let syncCancelled=false; // v1.0.17：「实际状态回查」可中途停止（cancelSync 不排队，立即生效）
 let lastFlowSwitch='';
 // —— 第 0 级诊断：把流程读取的每一步写进进度条和「诊断」，只报告，不改变任何点击、等待和判断 ——
 let flowT0=0,flowTrace=[];
@@ -396,6 +393,32 @@ async function confirmPatiently(command,label,onTick,alt,stage,generation){
   }
  }
 }
+// v0.9.196 成功口径 = 门户弹出“提交成功” 且 调整单标签自动关闭，两样都出现才算。
+// v1.0.17：批量改状态与“改回原状态”共用这一个判据（原来改回只要其一）。
+async function waitDoneSignals(confirmHit,cs,stage,check,next){
+ let sawToast=!!(confirmHit&&(confirmHit.via==='toast'||confirmHit.toast));
+ let sawClosed=!!(confirmHit&&confirmHit.submissionComplete);
+ let closedAt=sawClosed?Date.now():0;
+ const sigEnd=Date.now()+15000;
+ if(stage)stage('等待门户完成：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
+ while(Date.now()<sigEnd&&!(sawToast&&sawClosed)){
+  if(check)check();
+  await pause(120);
+  if(!sawClosed){
+   try{const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(st&&st.forms===0){sawClosed=true;closedAt=Date.now();}}catch{}
+  }
+  if(!sawToast){
+   try{const t=await run({type:'toastState'});if(t.some(r=>r&&r.toast))sawToast=true;}catch{}
+  }
+  if(sawClosed&&!sawToast&&Date.now()-closedAt>2000)break;
+  const sec=Math.round((Date.now()-cs)/1000);
+  if(stage)stage('等待门户完成（'+sec+' 秒）：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
+ }
+ if(!(sawToast&&sawClosed)){
+  throw Error('提交后没有同时出现“提交成功”和调整单自动关闭（'+(sawToast?'已看到提交成功':'未看到提交成功')+'、'+(sawClosed?'标签已关闭':'标签仍未关闭')+'）；本次记结果不明'+(next?'，'+next:'')+'，可稍后到原站核对。');
+ }
+ return {sawToast,sawClosed};
+}
 // 遗留的调整单若还在“加载中”（上一单保存未完），先等它完成，绝不在保存中途关掉
 async function waitSaved(stage,check){
  const end=Date.now()+90000;
@@ -456,6 +479,7 @@ async function closeQueryPanel(){
   let out;try{out=await run({type:'closeQuery'});}catch{return false;}
   if(!out.length)return false;
   if(out.some(r=>r&&r.error))return false;
+  if(out.some(r=>r&&r.wrongTab))return false; // 快件查询不在前台：这次关不了，如实返回未关闭
   if(out.some(r=>r&&r.closed)){await pause(150);return true;}
   if(out.some(r=>r&&r.cleared)){await pause(120);continue;}
   if(out.some(r=>r&&r.none))return false;
@@ -525,6 +549,7 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    }
    if(msg.type==='page'){if(!['next','prev','first'].includes(msg.direction))throw Error('无效分页方向');await navigate('query');return readPage(msg.direction);}
    if(msg.type==='cancelFlow'){flowCancelled=true;return {cancelled:true};}
+   if(msg.type==='cancelSync'){syncCancelled=true;return {cancelled:true};}
    if(msg.type==='flowFirst'){flowCancelled=false;flowBegin('读取前 N 页（'+msg.flowTab+'）');return flowFirst(msg.flowTab);}
     if(msg.type==='flowDate'){
      if(msg.flowTab)await ensureFlowTab(msg.flowTab);
@@ -637,7 +662,8 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     // 顺序按现场：先点条件行右侧红色错号，再点「关闭查询」（source.js closeQuery）
     await pause(250);
     let closed=false;try{closed=await closeQueryPanel();}catch{}
-    if(!closed){await pause(400);try{closed=await closeQueryPanel();}catch{}}
+    // 第一次没关上（多半是读取中途门户切到了别的标签）：先切回「快件查询」再关一次
+    if(!closed){await pause(400);try{await ensurePortalPage('query');closed=await closeQueryPanel();}catch{}}
     return {ended:true,closed};
    }
    if(msg.type==='beginAll'){
@@ -685,13 +711,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
  const statuses={},failures=[];
  // 一次最多 300 个；超出的不能悄悄丢掉，记进失败清单（工作台正常按 200 个一批发，不会走到这里）
  for(const id of valid.slice(300))failures.push({id,reason:'超出单次 300 个上限，本次未查'});
- const batchEnd=Date.now()+15*60*1000;let consecutive=0;
+ const batchEnd=Date.now()+15*60*1000;let consecutive=0;syncCancelled=false;
  try{
   // 只要原站有「快件查询」就能查；其他页面开没开、关没关都不管
   await navigate('query');
   await ensurePortalPage('query');
   try{await clearQueryTags();}catch{}
   for(let i=0;i<ids.length;i++){
+   if(syncCancelled){for(let k=i;k<ids.length;k++)failures.push({id:ids[k],reason:'已停止（手动取消）'});break;}
    if(Date.now()>batchEnd||consecutive>=8){for(let k=i;k<ids.length;k++)failures.push({id:ids[k],reason:'已停止（超时或连续失败）'});break;}
    const id=ids[i];
    let ok=false,lastErr='';
@@ -734,7 +761,8 @@ if(msg.type==='statusPreflight'){
      let closed=0;
      // v1.0.0 修复：保存中绝不关调整单（0.9.195 的教训），先等门户保存完再关
      if(portal.forms>0&&await portalSaving()){
-       try{await waitSaved();}catch{}
+       // v1.0.17：等不完就停下，不再吞掉超时继续关标签（保存中关调整单会卡住门户）
+       await waitSaved();
        portal=await readPortal();
      }
      for(let i=0;i<3&&portal.forms>0;i++){
@@ -899,7 +927,11 @@ mark('portal');
     let confirmHit=null;
     try{confirmHit=await confirmPatiently({type:'confirmSubmit',order:msg.order,target:msg.target,token:confirmToken},'原站提交确认未完成',confirmTick,{command:{type:'submissionComplete',order:msg.order,target:msg.target,token:confirmToken},flag:'submissionComplete'},stage,generation);}
     catch(e){
-      if(/提示框连续点 3 次/.test(e.message)){try{await run({type:'closeFormTab'});}catch{}throw Error('提示框点了 3 次「确定」仍未关闭，已关闭“物流状态调整单”并跳过本单，继续下一单。');}
+      if(/提示框连续点 3 次/.test(e.message)){
+        // v1.0.17：原站若正在保存（加载中），绝不关调整单（0.9.195 的教训）；只记结果不明
+        if(await portalSaving())throw Error('提示框点了 3 次「确定」仍未关闭，且原站正在保存（加载中）；为避免卡住门户未关闭调整单，本单结果不明，勿重复提交，请稍后到原站核对。');
+        try{await run({type:'closeFormTab'});}catch{}throw Error('提示框点了 3 次「确定」仍未关闭，已关闭“物流状态调整单”并跳过本单，继续下一单。');
+      }
       if(e.stillSaving)throw Error(e.message+staleNote+'；'+(await pressNote(confirmToken)));
       if(/原站拒绝提交|原站提示.*未改成功/.test(e.message)){
         try{await run({type:'formAlert'});}catch{}
@@ -914,28 +946,7 @@ mark('portal');
       throw Error(e.message+(extra?'（'+extra+'）':'')+open+staleNote+'；本次不跳回“快件查询”回读，请稍后在历史里看结果或手动核对。');
     }
     mark('confirmed');
-    // v0.9.196：成功口径 = 门户弹出“提交成功” 且 调整单标签自动关闭，两样都出现才算
-    let sawToast=!!(confirmHit&&(confirmHit.via==='toast'||confirmHit.toast));
-    let sawClosed=!!(confirmHit&&confirmHit.submissionComplete);
-    let closedAt=sawClosed?Date.now():0;
-    const sigEnd=Date.now()+15000;
-    stage('等待门户完成：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
-    while(Date.now()<sigEnd&&!(sawToast&&sawClosed)){
-      if(generation!==writeGeneration)throw cancelledAfterSubmit();
-      await pause(120);
-      if(!sawClosed){
-        try{const st=(await run({type:'portalState'})).filter(r=>Array.isArray(r.tabs))[0];if(st&&st.forms===0){sawClosed=true;closedAt=Date.now();}}catch{}
-      }
-      if(!sawToast){
-        try{const t=await run({type:'toastState'});if(t.some(r=>r&&r.toast))sawToast=true;}catch{}
-      }
-      if(sawClosed&&!sawToast&&Date.now()-closedAt>2000)break;
-      const sec=Math.round((Date.now()-cs)/1000);
-      stage('等待门户完成（'+sec+' 秒）：'+(sawToast?'已看到提交成功':'等提交成功')+'、'+(sawClosed?'标签已关':'等标签关闭'));
-    }
-    if(!(sawToast&&sawClosed)){
-      throw Error('提交后没有同时出现“提交成功”和调整单自动关闭（'+(sawToast?'已看到提交成功':'未看到提交成功')+'、'+(sawClosed?'标签已关闭':'标签仍未关闭')+'）；本次记结果不明，已继续下一单，可稍后到原站核对。');
-    }
+    await waitDoneSignals(confirmHit,cs,stage,()=>{if(generation!==writeGeneration)throw cancelledAfterSubmit();},'已继续下一单');
     mark('settled');stage('已提交');
     return {submitted:true,confirmed:true,resubmitted:!!(confirmHit&&confirmHit.resubmitted),completion:'confirmed',timing,basis:'提交成功+调整单自动关闭',staleToast,presses:await pressNote(confirmToken)};
    }
@@ -982,9 +993,13 @@ mark('portal');
     if(!out.some(r=>r.submitted))throw Error('原站表单不匹配或提交结果不明，未改回。');
     stage('等待原站点“确定”…');
     // 与批量改状态同一判据：点「确定」后新出现“提交成功”，或调整单标签自动关闭；都没有就报结果不明
-    const rtoken='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-    const hit=await confirmPatiently({type:'confirmSubmit',order:{id:msg.id},target:msg.from,token:rtoken},'原站提交确认未完成',undefined,{command:{type:'submissionComplete',order:{id:msg.id},target:msg.from,token:rtoken},flag:'submissionComplete'},stage);
-    return {submitted:true,from:cur,to:msg.from,basis:hit&&hit.submissionComplete?'调整单标签已自动关闭':'看到“提交成功”'};
+    const rs=Date.now(),rtoken='r'+rs.toString(36)+Math.random().toString(36).slice(2,6);
+    // 点了提交之后的任何失败都是“结果不明”：工作台据此记历史，提示勿重复改回
+    try{
+     const hit=await confirmPatiently({type:'confirmSubmit',order:{id:msg.id},target:msg.from,token:rtoken},'原站提交确认未完成',undefined,{command:{type:'submissionComplete',order:{id:msg.id},target:msg.from,token:rtoken},flag:'submissionComplete'},stage);
+     await waitDoneSignals(hit,rs,stage);
+    }catch(e){throw Error(/结果不明/.test(e.message)?e.message:e.message+'；改回提交已发出，结果不明，勿重复改回。');}
+    return {submitted:true,from:cur,to:msg.from,basis:'提交成功+调整单自动关闭'};
    }
    if(msg.type==='notices'){
     const out=await run({type:'notices'});
