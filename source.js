@@ -754,7 +754,15 @@ function sourceAction(command){
   }
   if(command.type==='confirmResidue'){
    const hit=fhDialogs();
-   return {residue:hit.length,diag:hit.length?fhDiag(fhOkBtn(hit[0]),false):''};
+   // v1.0.22 诊断（不改行为）：残留确认框在哪个页面、这个页面此刻是否真的显示着、门户激活的是哪个标签——
+   // 历史里出现过“一单被拒后，后面每单都报残留确认框关不掉”的连锁，还不知道框在哪，先记下来
+   let where='';
+   if(hit.length){
+    let shown=true;try{let w=window;while(w.frameElement){const r=w.frameElement.getBoundingClientRect();if(!(r.height>0&&r.width>0)){shown=false;break;}w=w.parent;}}catch{shown='?';}
+    let act='';try{const a=window.top.document.querySelector('.mini-tab-active');act=a?text(a).replace(/\s+/g,''):'无';}catch{act='?';}
+    where=(location.pathname.split('/').pop()||'?')+'，'+(shown===true?'页面显示中':shown===false?'页面已隐藏':'显示状态未知')+'，门户当前标签「'+act+'」';
+   }
+   return {residue:hit.length,where,diag:hit.length?fhDiag(fhOkBtn(hit[0]),false):''};
   }
   if(command.type==='confirmCancel'){
    // 取消批量后：如果原站还停着「您确定要提交吗」的确认框，点“取消”关掉，避免之后误点确定真的提交

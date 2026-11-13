@@ -37,7 +37,7 @@ function boot(rowsAt){
 
  // 4) 工作台：没确认过的空列表不能清掉本地待办；确认过的可以
  const live=fs.readFileSync(D+'live.js','utf8');
- const s1=live.indexOf('// replace=true'),s2=live.indexOf('// 所有读取都做加法');
+ const s1=live.indexOf('// v1.0.22：每次读取都用本次结果刷新'),s2=live.indexOf('// v1.0.22：所有读取都用本次结果刷新');
  const L=new Function('SourceMapping',`let records={query:[],flow:[]},snapshots={query:null,flow:null},lastReadError='';
 ${live.slice(s1,s2)};return {get records(){return records},setSnapshotExtra};`)(SourceMapping);
  const snap=(rows,extra={})=>({kind:'flow',flowTab:'待办',headers,rows,page:1,pageSize:10,total:rows.length,readAt:'t',...extra});

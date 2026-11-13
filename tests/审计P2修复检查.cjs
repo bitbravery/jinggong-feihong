@@ -6,7 +6,7 @@ const {sourceAction}=require(D+'source.js');
 const live=fs.readFileSync(D+'live.js','utf8');
 
 // ============ live.js：合并、快照、写后状态、历史保存 ============
-const a=live.indexOf('// replace=true'),b=live.indexOf('// 所有读取都做加法');
+const a=live.indexOf('// v1.0.22：每次读取都用本次结果刷新'),b=live.indexOf('// v1.0.22：所有读取都用本次结果刷新');
 assert(a>0&&b>a,'找不到 live.js 合并/快照原文');
 const L=new Function('SourceMapping',`let records={query:[],flow:[]},snapshots={query:null,flow:null},lastReadError='';
 ${live.slice(a,b)};return {get records(){return records},set records(v){records=v},snapshots,mergeParsed,setSnapshotExtra,markWritten};`)(SourceMapping);
@@ -19,7 +19,7 @@ L.setSnapshotExtra({kind:'query',headers:qh,rows:[row(1,'JGKD700003','已揽件'
 let s=L.snapshots.query;
 assert.equal(s.pageSize,100,'读取当前页后每页条数被清空，“下一页”永远不可点');
 assert.equal(s.total,643,'快照总数应保持原站总数');
-assert.equal(s.fetched,1);assert.equal(s.localCount,3);
+assert.equal(s.fetched,1);assert.equal(s.localCount,1,'v1.0.22 起每次读取都刷新，本地只剩本次读到的');
 const nextDisabled=new Function('busy','s',`return ${live.match(/\$\('nextPage'\)\.disabled=([^;]+);/)[1]};`);
 assert.equal(nextDisabled(false,s),false,'原站第 1 页、共 643 条时“下一页”应可点');
 assert.equal(nextDisabled(false,{...s,page:7}),true,'最后一页时“下一页”应禁用');

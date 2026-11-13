@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.21';
+const COMPONENT_VERSION = '1.0.22';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -385,6 +385,9 @@ async function flowFirst(flowTab){
  return {...first,flowTab,emptyConfirmed:!(first.rows&&first.rows.length),pageCount:first.total>0?Math.max(1,Math.ceil(first.total/first.pageSize)):1};
 }
 let preparedWrite=null,writeGeneration=0;
+// v1.0.22：等调整单加载出输入框的上限。原来 10 秒——历史记录里 13 批有 7 批第一单就因此失败（冷启动加载慢，平时 0.2 秒）。
+// 这一步还没填单号，多等不会有副作用。
+const FORM_READY_WAIT=30000;
 // 原站是否正在“加载中”（点「确定」后保存期间整页蒙灰；v0.9.178 现场截图）
 // 诊断：本单点了几次「确定」、间隔多久、浏览器网络请求记录有多少条（满 250 条时“已点过就别再点”的判断会失效）
 async function pressNote(token){try{const p=(await run({type:'pressInfo',token})).find(r=>r&&r.pressInfo);if(!p)return '';if(!p.count)return '没有记录到点「确定」';return '点「确定」'+p.count+' 次'+(p.gaps&&p.gaps.length?'（间隔 '+p.gaps.join('、')+' 秒）':'')+(p.mini?'，含一次控件点击事件':'')+'；浏览器网络请求记录 '+p.buf+' 条'+(p.buf>=250?'（已满 250 条，“已点过就别再点”的判断失效）':'');}catch{return '';}}
@@ -821,12 +824,14 @@ if(msg.type==='statusPreflight'){
      }
            // v0.9.197：残留确认框点两次（间隔 200ms）；仍关不掉就跳过本单，不再空等 2 分钟
       for(let t=0;t<2;t++){
-        const left=(await run({type:'confirmResidue'}).catch(()=>[])).reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
+        const res=await run({type:'confirmResidue'}).catch(()=>[]);
+        const left=res.reduce((m,r)=>Math.max(m,(r&&r.residue)||0),0);
+        const where=res.filter(r=>r&&r.residue).map(r=>r.where).filter(Boolean).join('；');
         if(!left)break;
         stage('清理上一次遗留的确认框…');
         try{await run({type:'confirmDismiss'});}catch{}
         await pause(200);
-        if(t===1)throw Error('原站残留的“您确定要提交吗”确认框关不掉；本单已跳过，不影响后续单，可稍后手动处理。');
+        if(t===1)throw Error('原站残留的“您确定要提交吗”确认框关不掉；本单已跳过，不影响后续单，可稍后手动处理。'+(where?'（诊断：'+where+'）':''));
       }
 mark('portal');
      if(reuse){
@@ -847,8 +852,8 @@ mark('portal');
      await ensureFormActive(stage);
      try{await closeQueryPanel();}catch{}
      await ensurePortalPage('form',stage,generation);
-     stage('等待识别调整单输入框（最多 10 秒，尚未填写单号）…');
-     try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000,undefined,()=>ensurePortalPage('form',stage,generation));}
+     stage('等待调整单加载出输入框（最多 '+FORM_READY_WAIT/1000+' 秒，尚未填写单号）…');
+     try{await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,FORM_READY_WAIT,undefined,()=>ensurePortalPage('form',stage,generation));}
      catch(e){const inv=await inventory();let tabs='';try{const p2=await readPortal();tabs='；调整单标签 '+(p2.forms??'?')+' 张'+(p2.formActive?'（活动）':'');}catch{}throw Error(e.message+(inv?'；原站页面：'+inv:'')+tabs+(/未加载完成/.test(e.message)?'。若“物流状态调整单”标签已经消失，说明原站打开后又关闭了该表单，请看门户页面的提示。':''));}
      // 回车后没联动出订单信息时，每 1 秒补按一次回车，最多再补两次（共 3 次），仍无则跳过本单
            let matched=false,lastErr=null,names=null,freshRetry=false,attempt=0;
@@ -880,7 +885,7 @@ mark('portal');
          await waitSource({type:'openForm'},'openRequested','原站物流状态调整办理入口未加载完成',generation,undefined,60000,undefined,()=>ensurePortalPage('service',stage,generation));
          await waitSource({type:'navigate',kind:'form'},'navigated','原站状态表单标签未出现',generation);
          await ensurePortalPage('form',stage,generation);
-         await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,10000,undefined,()=>ensurePortalPage('form',stage,generation));
+         await waitSource({type:'prepare',order:msg.order},'prepared','未能识别或准备物流调整单输入控件；尚未完成单号填写，不代表单号无效',generation,undefined,FORM_READY_WAIT,undefined,()=>ensurePortalPage('form',stage,generation));
          continue;
         }
         if(!/未联动|未出订单信息|未加载完成/.test(e.message))throw e;
@@ -946,6 +951,13 @@ mark('portal');
         try{await run({type:'closeFormTab'});}catch{}throw Error('提示框点了 3 次「确定」仍未关闭，已关闭“物流状态调整单”并跳过本单，继续下一单。');
       }
       if(e.stillSaving)throw Error(e.message+staleNote+'；'+(await pressNote(confirmToken)));
+      // v1.0.22：原站校验没通过（多为“数据不完整”）＝确认框根本没出来、这单没有提交。历史里 23 单这样被拒的，之后没有一单改成功过：
+      // 是这单的地址值原站已不认（楼宇改名或下线），要在原站手动改好地址。按“原站拒绝，未提交”报，不再记成结果不明。
+      if(/本单未提交/.test(e.message)&&!/提交已发出|结果不明/.test(e.message)){
+        try{await run({type:'formAlert'});}catch{}
+        const f=e.message.match(/控件【([^】]+)】数据不完整,值是:([^,，]*)/);
+        throw Object.assign(Error('原站拒绝提交，本单未提交：'+(f?'「'+f[1]+'」的值“'+f[2].replace(/@#@/g,'').trim()+'”原站已不认（多半是楼宇改名或已下线），需要先在原站把地址改成列表里有的选项，再改状态。':e.message.replace(/；?本单未提交.*$/,'')+'。')),{rejected:true});
+      }
       if(/原站拒绝提交|原站提示.*未改成功/.test(e.message)){
         try{await run({type:'formAlert'});}catch{}
         throw Error(e.message);

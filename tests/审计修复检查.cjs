@@ -1,6 +1,6 @@
 // v1.0.17：审计 P1/P2 修复——全部执行真实代码，不做文本匹配。
 // 1) 已办回查到的真实状态不会被重读“已办”覆盖回订单申请
-// 2) 待办读到完整列表时整类替换：已通过/退回的单从本地待办消失
+// 2) 已通过/退回的单重读后从本地待办消失（v1.0.22 起每次读取都刷新，不再只增不减）
 // 3) 精确查询：联系人一个都没联动出来时报“读不到”，不把表单默认勾选当真实状态
 // 4) 已办回查超过 300 个单号时不悄悄丢单
 // 5) 字号后台存取范围与工作台一致（10–40，默认 30）
@@ -10,14 +10,14 @@ const SourceMapping=require(D+'mapping.js'),policy=require(D+'write-policy.js');
 const live=fs.readFileSync(D+'live.js','utf8');
 
 // —— 取出 live.js 里的合并相关函数原文执行 ——
-const a=live.indexOf('// replace=true'),b=live.indexOf('function setSnapshotExtra');
+const a=live.indexOf('// v1.0.22：每次读取都用本次结果刷新'),b=live.indexOf('function setSnapshotExtra');
 assert(a>0&&b>a,'找不到 mergeParsed/wholeTodo 原文');
 const records={query:[],flow:[]};
-const {mergeParsed,wholeTodo}=new Function('records','SourceMapping',live.slice(a,b)+';return {mergeParsed,wholeTodo};')(records,SourceMapping);
+const {mergeParsed,untrustedEmpty}=new Function('records','SourceMapping',live.slice(a,b)+';return {mergeParsed,untrustedEmpty};')(records,SourceMapping);
 const headers=['序号','单号','物流信息','寄件人姓名','寄件人工号','寄件校区地址','收件人姓名','收件校区地址'];
 const row=(n,id,st)=>[String(n),id,st,'甲','1','良乡','乙','中关村'];
 const snap=(tab,rows,total,extra={})=>({kind:'flow',flowTab:tab,headers,rows,page:1,total,rowIds:rows.map((_,i)=>'r'+i),readAt:'t',...extra});
-const load=s=>mergeParsed(SourceMapping.normalize(s),'flow',s.flowTab,{replace:wholeTodo(s)});
+const load=s=>mergeParsed(SourceMapping.normalize(s),'flow',s.flowTab,{keepOld:untrustedEmpty(s)});
 
 // 1) 回查后再读已办
 load(snap('已办',[row(1,'JGKD900001','订单申请')],1));
@@ -40,14 +40,14 @@ const r2=load(snap('待办',[],0,{emptyConfirmed:true}));
 assert.equal(records.flow.filter(o=>o.flow==='待办').length,0,'通过后的单仍留在本地待办');
 assert.equal(r2.removed,2);
 assert(records.flow.some(o=>o.id==='JGKD900001'&&o.flow==='已办'),'整类替换待办时不能动已办');
-// 只读到一部分（总数 > 本页行数）时不能替换，旧行保留
+// v1.0.22：每次读取都以本次结果为准（用户要求），读到哪些就是哪些
 load(snap('待办',[row(1,'JGKD900005','订单申请'),row(2,'JGKD900006','订单申请')],2));
 load(snap('待办',[row(1,'JGKD900005','订单申请')],30));
-assert(records.flow.some(o=>o.id==='JGKD900006'&&o.flow==='待办'),'只读到部分待办时误删了旧行');
-// 总数认不出时也不替换
+assert.deepEqual(records.flow.filter(o=>o.flow==='待办').map(o=>o.id),['JGKD900005'],'重读后旧行还留着');
+// 0 行又没等过加载确认：这次结果不可信，保留上次的列表
 load(snap('待办',[],null));
-assert.equal(records.flow.filter(o=>o.flow==='待办').length,2);
-console.log('通过：待办读到完整列表才整类替换；只读到部分或总数不明时保留旧行。');
+assert.equal(records.flow.filter(o=>o.flow==='待办').length,1);
+console.log('通过：已通过的单重读后从本地待办消失；没确认过的空读取不清空列表。');
 
 // —— worker.js 在 vm 里跑，原站动作用假 run 代替 ——
 function boot(fakeRun,store={}){
