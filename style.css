@@ -124,8 +124,8 @@ body.has-selection-bar #work{padding-bottom:96px}
 .print-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fff}
 .print-hint{margin:0;padding:8px 14px;font-size:12px;color:#5f6f69;background:#f6faf8;border-bottom:1px solid var(--line)}
 .print-form{padding:24px 30px;background:#fff;color:#111;font-size:12px}
-.pf-title{text-align:center;font-size:20px;width:70%;margin:0 auto 2px}
-.pf-no{text-align:center;color:#333;margin:0 auto 6px;font-size:20px;letter-spacing:.2px;width:70%}
+.pf-title{text-align:center;font-size:20px;font-weight:400;letter-spacing:3.8px;width:70%;margin:0 auto 2px}
+.pf-no{text-align:center;color:#333;margin:0 auto 6px;font-size:16.4px;font-weight:400;letter-spacing:0;width:70%}
 .pf-sec{background:#e9edf2;border-left:4px solid #2f6fb3;padding:5px 9px;margin:7px 0 4px;font-size:15px;font-weight:600}
 .pf-table{width:100%;border-collapse:collapse;margin-bottom:7.2px}
 .pf-table th,.pf-table td{border:1px solid #333;padding:4px 8px;font-weight:400;text-align:left}
