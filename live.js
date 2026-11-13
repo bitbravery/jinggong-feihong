@@ -100,7 +100,8 @@ function mergeParsed(parsed,kind,flowTab,{replace=false}={}){
 // 下一次从「快件查询」读到该单时以原站为准覆盖；已办流程列表的“订单申请”不会覆盖它（见 mergeParsed）。
 function markWritten(id,status){let n=0;for(const k of ['query','flow'])records[k]=records[k].map(o=>o.id===id?(n++,{...o,status,statusSource:'write'}):o);return n;}
 // 待办读到的是第 1 页且原站总数 = 本页行数：这就是待办的全部，可以整类替换（通过/退回后的单才会从本地待办消失）
-function wholeTodo(s){return !!s&&s.kind==='flow'&&s.flowTab==='待办'&&(s.page||1)===1&&Number.isInteger(s.total)&&Array.isArray(s.rows)&&s.rows.length===s.total;}
+// v1.0.20：0 行只有在后台等过加载、确认原站确实为空（emptyConfirmed）时才算完整，否则一次过早的读取会清空本地待办
+function wholeTodo(s){return !!s&&s.kind==='flow'&&s.flowTab==='待办'&&(s.page||1)===1&&Number.isInteger(s.total)&&Array.isArray(s.rows)&&s.rows.length===s.total&&(s.rows.length>0||!!s.emptyConfirmed);}
 let lastReadIds=null;
 function setSnapshotExtra(s,{singlePage=false}={}){
  lastReadError='';
@@ -114,7 +115,7 @@ function setSnapshotExtra(s,{singlePage=false}={}){
 // 所有读取都做加法：旧记录保留，本次新出现的追加，同一条用新数据更新
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.19')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.20')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -124,7 +125,7 @@ async function read(){
      toast(keep?'原站查询页暂无数据（可能还在加载），已保留上次结果；可再点一次「读取当前页」。':'原站查询页暂无数据：请确认门户停在查询结果页并已查询，再点「读取当前页」。');
      busy=false;$('bulkProgress').hidden=true;$('readSource').textContent='读取当前页';render();return;
    }
-   const merge=mergeSnapshot(s);Object.assign(readProgress,{rows:merge.total,total:merge.total,page:1,pages:1,percent:100,note:'仅当前页'});drawReadProgress();$('bulkCount').textContent='已查询 '+merge.total+' 条 · '+(merge.first?'当前页进度 100%（仅本页）':'已合并（新增 '+merge.added+' / 更新 '+merge.updated+'）');$('bulkBar').max=100;$('bulkBar').value=100;render();toast(merge.first?'读取完成，已逐列映射 '+merge.total+' 件原站记录。':'原站当前页已合并：新增 '+merge.added+' 条、更新 '+merge.updated+' 条，共 '+merge.total+' 条（保留之前读取的旧记录）。');}
+   const merge=mergeSnapshot(s);Object.assign(readProgress,{rows:merge.total,total:merge.total,page:1,pages:1,percent:100,note:'仅当前页'});drawReadProgress();$('bulkCount').textContent='已查询 '+merge.total+' 条 · '+(merge.first?'当前页进度 100%（仅本页）':'已合并（新增 '+merge.added+' / 更新 '+merge.updated+'）');$('bulkBar').max=100;$('bulkBar').value=100;render();if(kind()==='flow'&&!s.rows.length)toast('原站「'+flowTab+'」现在没有单（已等原站加载 8 秒确认）。如果原站上明明有，请再点一次读取。',8000);else toast(merge.first?'读取完成，已逐列映射 '+merge.total+' 件原站记录。':'原站当前页已合并：新增 '+merge.added+' 条、更新 '+merge.updated+' 条，共 '+merge.total+' 条（保留之前读取的旧记录）。');}
  catch(e){lastReadError=e.message;$('connection').textContent='读取失败：'+e.message+' 现有列表未更新，请勿把旧列表当作最新结果。';readProgress.note='读取失败：'+e.message;drawReadProgress();$('bulkCount').textContent='已查询 0 条 · 本次读取未完成';$('bulkBar').max=100;$('bulkBar').value=0;toast(e.message);}
  finally{busy=false;$('bulkProgress').hidden=true;$('readSource').textContent='读取当前页';render();}
 }
@@ -383,7 +384,7 @@ async function readFlows(pages=5){
   }});
   const fresh=parts.flatMap(p=>SourceMapping.normalize(p));
   // 待办全部读完（读到的行数 = 原站总数）时整类替换，已通过/退回的单不再留在本地待办
-  const whole=flowTab==='待办'&&parts.length===1&&Number.isInteger(parts[0].total)&&parts[0].rows.length===parts[0].total;
+  const whole=flowTab==='待办'&&parts.length===1&&Number.isInteger(parts[0].total)&&parts[0].rows.length===parts[0].total&&(parts[0].rows.length>0||!!parts[0].emptyConfirmed);
   const agg=mergeParsed(fresh,'flow',flowTab,{replace:whole});
   // v0.9.206：原站把“已办”的状态一律写成订单申请，必须回「快件查询」核对真实状态
 

@@ -16,7 +16,7 @@ const records={query:[],flow:[]};
 const {mergeParsed,wholeTodo}=new Function('records','SourceMapping',live.slice(a,b)+';return {mergeParsed,wholeTodo};')(records,SourceMapping);
 const headers=['序号','单号','物流信息','寄件人姓名','寄件人工号','寄件校区地址','收件人姓名','收件校区地址'];
 const row=(n,id,st)=>[String(n),id,st,'甲','1','良乡','乙','中关村'];
-const snap=(tab,rows,total)=>({kind:'flow',flowTab:tab,headers,rows,page:1,total,rowIds:rows.map((_,i)=>'r'+i),readAt:'t'});
+const snap=(tab,rows,total,extra={})=>({kind:'flow',flowTab:tab,headers,rows,page:1,total,rowIds:rows.map((_,i)=>'r'+i),readAt:'t',...extra});
 const load=s=>mergeParsed(SourceMapping.normalize(s),'flow',s.flowTab,{replace:wholeTodo(s)});
 
 // 1) 回查后再读已办
@@ -34,7 +34,9 @@ console.log('通过：已办回查到的真实状态不会被重读覆盖；未�
 // 2) 待办：两单 → 原站通过后待办为空 → 重读
 load(snap('待办',[row(1,'JGKD900002','订单申请'),row(2,'JGKD900003','订单申请')],2));
 assert.equal(records.flow.filter(o=>o.flow==='待办').length,2);
-const r2=load(snap('待办',[],0));
+// v1.0.20：空列表只有后台等过加载、确认为空（emptyConfirmed）才算完整
+assert.equal(load(snap('待办',[],0)).removed,0,'没确认过的空读取清掉了本地待办');
+const r2=load(snap('待办',[],0,{emptyConfirmed:true}));
 assert.equal(records.flow.filter(o=>o.flow==='待办').length,0,'通过后的单仍留在本地待办');
 assert.equal(r2.removed,2);
 assert(records.flow.some(o=>o.id==='JGKD900001'&&o.flow==='已办'),'整类替换待办时不能动已办');

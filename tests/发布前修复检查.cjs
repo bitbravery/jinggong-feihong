@@ -15,7 +15,8 @@ assert(sync.includes('batchEnd')&&/consecutive>=8/.test(sync),'快速查询要�
 assert(sync.includes('attempt<2'),'单号失败要重试一次');
 
 // 3) 流程快照带 flowTab，避免把待办行当已办下一页
-const snapCount=(worker.match(/snapshot\('flow',msg\.flowTab\)/g)||[]).length;
+// v1.0.20：读取当前页改走 flowSnapshotSettled(msg.flowTab)（读到 0 行时等原站加载），同样带分类
+const snapCount=(worker.match(/(?:snapshot\('flow',|flowSnapshotSettled\()msg\.flowTab\)/g)||[]).length;
 assert(snapCount>=4,'流程读取/翻页快照都要带分类，当前 '+snapCount+' 处');
 
 // 4) 取消时顺手点掉「您确定要提交吗」的取消，避免之后误点确定

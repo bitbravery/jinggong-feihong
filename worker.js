@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.19';
+const COMPONENT_VERSION = '1.0.20';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -364,12 +364,25 @@ async function ensureFlowTab(flowTab){
 }
 // 读到的列表必须来自目标分类页，否则不把别的分类的数据记成这个分类
 function checkFlowPage(s,flowTab){if(s&&s.pathTab&&s.pathTab!==flowTab)throw Error('原站当前显示的是「'+s.pathTab+'」，不是「'+flowTab+'」，未读取（以免把「'+s.pathTab+'」的数据记成「'+flowTab+'」）。请稍后再读一次，或在原站手动点一下「'+flowTab+'」。');}
+// v1.0.20：切到分类后，原站常常先出表头、过一会儿才出行。刚切过去就读会读到 0 行（用户实测：第一次读待办 0 条，再点一次 5 条）。
+// 读到 0 行时最多再等 8 秒，期间一出行就用；8 秒后仍是 0 行才认定原站这一类确实是空的。
+const FLOW_EMPTY_WAIT=8000;
+async function flowSnapshotSettled(flowTab){
+ let snap=await snapshot('flow',flowTab);
+ if(snap&&Array.isArray(snap.rows)&&snap.rows.length)return snap;
+ flowStage('「'+flowTab+'」列表暂时是空的，等原站加载（最多 '+FLOW_EMPTY_WAIT/1000+' 秒）');
+ try{snap=await waitSnapshot('flow',s=>Array.isArray(s.rows)&&s.rows.length>0&&(!s.active||s.active===flowTab),'「'+flowTab+'」列表',flowTab,FLOW_EMPTY_WAIT);}
+ catch{snap=await snapshot('flow',flowTab);if(snap)snap={...snap,emptyConfirmed:true};}
+ return snap;
+}
 async function flowFirst(flowTab){
  await ensureFlowTab(flowTab);
+ await flowSnapshotSettled(flowTab);
  flowStage('回到第 1 页并核对行数');
  const first=await readPage('first','flow',flowTab);
  checkFlowPage(first,flowTab);
- return {...first,flowTab,pageCount:first.total>0?Math.max(1,Math.ceil(first.total/first.pageSize)):1};
+ // 前面已等过加载（flowSnapshotSettled），这里仍是 0 行就是原站确实没有
+ return {...first,flowTab,emptyConfirmed:!(first.rows&&first.rows.length),pageCount:first.total>0?Math.max(1,Math.ceil(first.total/first.pageSize)):1};
 }
 let preparedWrite=null,writeGeneration=0;
 // 原站是否正在“加载中”（点「确定」后保存期间整页蒙灰；v0.9.178 现场截图）
@@ -519,21 +532,21 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       if(whereKnown(await flowWhere())){
        // 认得出分类页显示状态：确认目标分类页在显示再读（点一次就等，不连点）
        await ensureFlowTab(msg.flowTab);
-       const snap=await snapshot('flow',msg.flowTab);
+       const snap=await flowSnapshotSettled(msg.flowTab);
        checkFlowPage(snap,msg.flowTab);
        return {...snap,flowTab:msg.flowTab};
       }
       let ok=false;
       try{const out=await run({type:'flowTab',flowTab:msg.flowTab});ok=out.some(r=>r.flowSelected);flowStage('切到「'+msg.flowTab+'」：'+(ok?'已在该分类':out.some(r=>r.clicked)?'点了「'+msg.flowTab+'」，1.5 秒后直接读':'未确认，1.5 秒后直接读'));}catch(e){flowStage('切换分类出错：'+e.message);}
       if(!ok)await pause(1500);
-      let snap=await snapshot('flow',msg.flowTab);
+      let snap=await flowSnapshotSettled(msg.flowTab);
       // v1.0.14：认不出分类状态时，1.5 秒后读到的可能还是上一分类（第一次读待办会读成已办 9 条）。
       // 先按页面名核对；不是目标分类就重新切一次再读，仍不对则明确报错，绝不把别的分类记成待办/已办。
       try{checkFlowPage(snap,msg.flowTab);}
       catch(first){
        flowStage('原站还停在「'+(snap.pathTab||'其他分类')+'」，重新切「'+msg.flowTab+'」后再读');
        await ensureFlowTab(msg.flowTab);
-       snap=await snapshot('flow',msg.flowTab);
+       snap=await flowSnapshotSettled(msg.flowTab);
        checkFlowPage(snap,msg.flowTab);
       }
       return {...snap,flowTab:msg.flowTab};
