@@ -8,13 +8,13 @@
 SHA256：`E234E4E63C5939D43D9989FCC86A1E9F7B59F2A0FA91014AD881871346D98488`
 
 > 安装包已发布在 [Releases · v1.0.13](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.13)；升级请覆盖原目录并在扩展管理页点卡片刷新。
-
-> 下载后在 Edge 里「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
+ 
+> 下载后在 Edge ，360浏览器 ，Chrome 等浏览器「加载解压缩的扩展」即可，三步见下方[安装](#安装推荐下载-release-发布包)。
 > 只想要源码：`Code → Download ZIP`（不含打包好的发布包，版本需自行确认）。
 
 面向北京理工大学良乡 / 中关村两校区快递收发场景的浏览器扩展：在门户（ehall）之上做**查询、分类、批量读取、状态调整、打印申请单**，把原本要在门户里反复点击的操作收敛到一个工作台里。
 
-> 当前版本 **1.0.0**（以 `manifest.json` 为准），仅支持 Microsoft Edge（Chromium 内核 MV3）。
+> 当前版本 **1.0.0**（以 `manifest.json` 为准），仅支持 Microsoft Edge，360浏览器和 Chrome 等可安装插件的浏览器。
 
 ## 它解决什么问题
 
@@ -28,7 +28,7 @@ SHA256：`E234E4E63C5939D43D9989FCC86A1E9F7B59F2A0FA91014AD881871346D98488`
 
 ## 安装（推荐：下载 Release 发布包）
 
-1. 打开本仓库右侧 **Releases**（或直接访问 [v1.0.13](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.13)），下载发布包 `jinggong-feihong-v1.0.13.zip`；
+1. 打开本仓库右侧 **发布**（或直接访问 [v1.0.13](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.13)），下载发布包 `jinggong-feihong-v1.0.13.zip`；
 2. 解压到**固定目录**，例如 `D:\京工飞鸿\`（升级要保持同一路径）；
    - 确认解压后该目录里**直接**能看到 `manifest.json`；如果多套了一层文件夹，加载时选到里面那一层；
    - 目录里不能有以 `_` 开头的文件，否则 Edge 会拒绝加载。
