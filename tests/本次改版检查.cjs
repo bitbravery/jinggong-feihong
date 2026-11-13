@@ -36,6 +36,10 @@ assert(/\.status-option:has\(input:checked\)/.test(css),'选中态要有样式')
 
 // 4) 表格字号：密度左侧的新选择 + 自定义 + 持久化
 assert(/id="pageFont"/.test(html)&&/id="pageFontCustom"/.test(html),'要有页面字号与自定义输入');
+assert(/<option value="30" selected>/.test(html),'默认页面字号要是 30');
+assert(/defaultPx:30/.test(live)&&/max:40/.test(live),'页面字号要允许 30，自定义上限放到 40');
+assert(/'12','14','16','18','30'/.test(live),'30 要是可选预设，不能落到自定义输入');
+assert(/migratedKey/.test(live),'老用户默认 14 要能一次性迁到 30');
 assert(html.indexOf('id="pageFont"')<html.indexOf('id="tableDensity"'),'字号选择应在密度左侧');
 assert(!/id="tableFont"/.test(html),'旧的表格字号控件应已移除');
 assert(/--page-fs/.test(css),'页面字号通过 CSS 变量暴露');

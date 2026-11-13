@@ -29,17 +29,17 @@ r=strip({type:'flowTab',flowTab:'待办',force:true});assert(r.clicked);assert.e
 
 // ---------- B. 编排层 ----------
 function harness(){
- let listener,time=0;const log=[];const st={showing:'抄送给我',portalOnFlow:true,switchAt:Infinity,pending:null,neverSwitch:false};
+ let listener,time=0;const log=[];const st={showing:'抄送给我',portalOnFlow:true,switchAt:Infinity,pending:null,neverSwitch:false,known:true,switchDelay:1000};
  const ctx={importScripts(){},Date:{now:()=>time},setTimeout:fn=>{time+=250;fn();},
   chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async()=>{}},storage:{session:{get:async()=>({sourceTabId:1})}},tabs:{update:async()=>{}},scripting:{executeScript:async()=>[]}}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/../worker.js','utf8'),ctx);
  const files={'待办':'toDoList.htm','已办':'haveToDoList.htm','抄送给我':'makeCopeList.htm'};
- const tick=()=>{if(st.pending&&time>=st.switchAt){st.showing=st.pending;st.pending=null;}};
+ const tick=()=>{if(st.pending&&time>=st.switchAt){st.showing=st.pending;st.pending=null;st.known=true;}};
  ctx.fakeRun=async c=>{
   time+=40;tick();log.push({t:time,type:c.type,kind:c.kind});
-  if(c.type==='flowWhere')return Object.entries(files).map(([tab,file])=>({flowWhere:true,file,tab,visible:st.portalOnFlow&&st.showing===tab}));
+  if(c.type==='flowWhere')return Object.entries(files).map(([tab,file])=>({flowWhere:true,file,tab,visible:st.known?(st.portalOnFlow&&st.showing===tab):null}));
   if(c.type==='navigate'){if(c.kind==='flow')st.portalOnFlow=true;return [{navigated:true}];}
-  if(c.type==='flowTab'){if(!st.neverSwitch){st.pending=c.flowTab;st.switchAt=time+1000;}return [{waiting:true,clicked:true,active:''}];}
+  if(c.type==='flowTab'){if(!st.neverSwitch&&!st.pending){st.pending=c.flowTab;st.switchAt=time+st.switchDelay;}return [{waiting:true,clicked:true,active:''}];}
   if(c.type==='snapshot'){if(!st.portalOnFlow||st.showing==='抄送给我')return [];const total=st.showing==='待办'?8:27255;
    return [{kind:'flow',path:'/EIP/cooperative/'+files[st.showing],pathTab:st.showing,headers:H,rows:Array.from({length:Math.min(20,total)},(_,i)=>['寄件申请信息单','JGKD'+i]),rowIds:[],page:1,pageSize:20,total,active:''}];}
   if(c.type==='page')return [{pageRequested:1,unchanged:true}];
@@ -76,5 +76,11 @@ function harness(){
  const taps=h.log.filter(x=>x.type==='flowTab').map(x=>x.t);
  assert(taps.length<=3,'最多点 3 次，实际 '+taps.length);
  for(let i=1;i<taps.length;i++)assert(taps[i]-taps[i-1]>=5000,'两次点击至少隔 5 秒');
- console.log('通过：按显示中的分类页判断；停在抄送给我不再空等（4 秒内读完）；已在目标不点；停在快件查询先切回【流程】；切不过去最多点 3 次且间隔 ≥5 秒，并拒绝读错分类。');
+
+ // 5) 认不出分类显示状态、切分类又超过 1.5 秒：第一次读取不得把「已办 9 条」当「待办」返回；
+ //    要自动重新切到待办再读，一次点击就拿到 8 条待办。
+ h=harness();h.st.known=false;h.st.showing='已办';h.st.switchDelay=3000;
+ res=await h.call({type:'read',kind:'flow',flowTab:'待办'});
+ assert(res.ok,res.error);assert.equal(res.data.pathTab,'待办');assert.equal(res.data.total,8,'第一次读取就要读到待办 8 条，不能读成已办 27255 条');
+ console.log('通过：按显示中的分类页判断；停在抄送给我不再空等（4 秒内读完）；已在目标不点；停在快件查询先切回【流程】；切不过去最多点 3 次且间隔 ≥5 秒，并拒绝读错分类；认不出分类时第一次读取也会等到目标分类。');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.13';
+const COMPONENT_VERSION = '1.0.14';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -499,7 +499,16 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
       let ok=false;
       try{const out=await run({type:'flowTab',flowTab:msg.flowTab});ok=out.some(r=>r.flowSelected);flowStage('切到「'+msg.flowTab+'」：'+(ok?'已在该分类':out.some(r=>r.clicked)?'点了「'+msg.flowTab+'」，1.5 秒后直接读':'未确认，1.5 秒后直接读'));}catch(e){flowStage('切换分类出错：'+e.message);}
       if(!ok)await pause(1500);
-      const snap=await snapshot('flow',msg.flowTab);
+      let snap=await snapshot('flow',msg.flowTab);
+      // v1.0.14：认不出分类状态时，1.5 秒后读到的可能还是上一分类（第一次读待办会读成已办 9 条）。
+      // 先按页面名核对；不是目标分类就重新切一次再读，仍不对则明确报错，绝不把别的分类记成待办/已办。
+      try{checkFlowPage(snap,msg.flowTab);}
+      catch(first){
+       flowStage('原站还停在「'+(snap.pathTab||'其他分类')+'」，重新切「'+msg.flowTab+'」后再读');
+       await ensureFlowTab(msg.flowTab);
+       snap=await snapshot('flow',msg.flowTab);
+       checkFlowPage(snap,msg.flowTab);
+      }
       return {...snap,flowTab:msg.flowTab};
     }
     await navigate(msg.kind);
