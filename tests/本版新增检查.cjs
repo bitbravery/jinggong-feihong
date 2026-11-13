@@ -32,6 +32,8 @@ assert(html.includes('id="sidebarNotes"'),'侧栏要有核心提示区域');
 assert(/10 分钟/.test(html),'要提醒每 10 分钟回原站刷新');
 assert(/不要点击操作原站/.test(html),'要提醒操作期间不要点原站');
 assert(/不代表 100% 正确/.test(html),'要有免责与反馈提示');
+const tabTip='原站请先打开且只打开工作台、流程、快件查询、京工飞鸿两校区快件系统这四个标签，并在改状态之前和之后分别刷新一下原网站并确保原网站不卡。';
+assert(html.split(tabTip).length-1>=2,'侧栏和提示页都要有原站四标签与改状态前后刷新的提醒');
 assert(css.includes('.sidebar-notes')&&css.includes('.sidebar-icon-only .sidebar-notes'),'折叠后不显示侧栏提示');
 
 // 5) 重要提示页扩写：关键提醒、主要功能、导出 Excel 的 A4 排版说明、最后一句
