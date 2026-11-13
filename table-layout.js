@@ -17,7 +17,7 @@
  headers.forEach((th,i)=>{
   const handle=document.createElement('span');handle.className='column-resizer';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','vertical');handle.setAttribute('aria-label','调整'+th.textContent+'列宽，左右方向键微调');th.append(handle);
   function resize(w){autoFit=false;widths[i]=Math.max(i===0?40:90,Math.min(900,w));apply();}
-  handle.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const start=e.clientX,width=widths[i];handle.setPointerCapture(e.pointerId);document.body.classList.add('resizing-columns');handle.onpointermove=m=>resize(width+m.clientX-start);handle.onpointerup=handle.onpointercancel=()=>{handle.onpointermove=null;document.body.classList.remove('resizing-columns');save();};};
+  handle.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const start=e.clientX,width=widths[i],r=th.getBoundingClientRect().width,z=th.offsetWidth&&r?r/th.offsetWidth:1;handle.setPointerCapture(e.pointerId);document.body.classList.add('resizing-columns');handle.onpointermove=m=>resize(width+(m.clientX-start)/z);handle.onpointerup=handle.onpointercancel=()=>{handle.onpointermove=null;document.body.classList.remove('resizing-columns');save();};};
   handle.ondblclick=()=>{resize(defaults()[i]);save();};
   handle.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();resize(widths[i]+(e.key==='ArrowRight'?10:-10));save();}};
  });

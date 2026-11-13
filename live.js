@@ -114,7 +114,7 @@ function setSnapshotExtra(s,{singlePage=false}={}){
 // 所有读取都做加法：旧记录保留，本次新出现的追加，同一条用新数据更新
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.18')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.19')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -732,9 +732,11 @@ function enqueueStatus(rows){
 async function pumpStatus(){
  if(statusBusy)return;
  statusBusy=true;
+ // 本轮开始时的查询方式；中途切换单选只影响下一轮
+ const mode=historyStatusMode;
  const btn=$('batchStatusCheck');if(btn)btn.disabled=true;
  try{
-  if(historyStatusMode==='fast'){
+  if(mode==='fast'){
    // 改状态/改回/读取进行中时不插队：原站一次只做一件事。
    while(busy){const b=$('batchStatusCheck');if(b)b.textContent='等待当前操作结束…';await new Promise(r=>setTimeout(r,500));}
    let totalIds=0,totalGot=0,totalFail=0;
@@ -797,7 +799,7 @@ async function pumpStatus(){
  }catch(e){
   toast('查询原站状态失败：'+e.message,10000);
   // 出错时把还没查的行标出来，不要静默丢弃队列
-  while(statusQueue.length){const it=statusQueue.shift();it.row.currentStatus='取不到（'+String(e.message||'查询失败').slice(0,40)+'）';it.row.via=historyStatusMode;it.row.checkedAt=formatTime(new Date());historyQueued.delete(it.iso);}
+  while(statusQueue.length){const it=statusQueue.shift();it.row.currentStatus='取不到（'+String(e.message||'查询失败').slice(0,40)+'）';it.row.via=mode;it.row.checkedAt=formatTime(new Date());historyQueued.delete(it.iso);}
   try{save();renderHistory();}catch{}
  }
  finally{

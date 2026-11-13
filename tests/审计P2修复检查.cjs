@@ -206,5 +206,8 @@ function boot(fakeRun,{store={}}={}){
  const css=fs.readFileSync(D+'style.css','utf8');
  for(const r of ['dialog{max-width:calc(94vw / var(--z,1))','.print-dialog{max-width:calc(96vw / var(--z,1))}','#changeDialog{max-height:calc(100vh / var(--z,1) - 28px)}'])assert(css.includes(r),'缺少：'+r);
  assert(/setProperty\('--z',String\(p\/this\.base\)\)/.test(live),'字号生效时要同步写 --z');
+ // 1.0.18 的教训：主列表区是整页滚动（overflow:visible、不限高）；给它加上限会让行溢出盖住页脚（字号 30 实测：面板到 1211px 截止，行排到 10969px）
+ const panelMax=[...css.matchAll(/\.parcel-panel\{[^}]*max-height:([^;}]+)/g)].map(m=>m[1].trim());
+ assert.equal(panelMax[panelMax.length-1],'none','.parcel-panel 最终的 max-height 必须是 none（当前依次为：'+panelMax.join(' → ')+'）');
  console.log('通过：弹窗等视口上限按页面缩放折算（实测数据见 docs 与 CHANGELOG）。');
 })().catch(e=>{console.error(e);process.exitCode=1;});

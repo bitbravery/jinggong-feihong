@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.18';
+const COMPONENT_VERSION = '1.0.19';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -454,7 +454,7 @@ async function waitLinked(id,stage){
  }
  return null;
 }
-async function waitSource(command,flag,label,generation,onTick,budget=60000,alt,onWrongTab){const end=Date.now()+budget;let detail='',holes=0,ticks=0,altTicks=0,seen=false,btn=-1,clicked=false,cdiag='',noToast=false;while(Date.now()<end){if(generation!==undefined&&generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');const out=await run(command);if(out.some(r=>r.timeout)){if(++holes>=4)throw Error('原站页面连续无响应（约30秒），已停止操作'+(generation!==undefined?'；原站尚未提交':'')+'。请检查原站是否卡在弹窗或加载中。');await pause(120);continue;}holes=0;const error=out.find(r=>r.error);if(error)throw Error(error.error);if(onWrongTab&&out.some(r=>r&&r.wrongTab)){await onWrongTab();continue;}let done=out.filter(r=>r[flag]);if(done.length>1&&command.kind==='flow')done=[done[0]];else if(done.length>1)throw Error('发现多个匹配页面，停止操作。');if(done.length===1)return done[0];if(alt&&++altTicks%4===0){let ao=null;try{ao=await run(alt.command);}catch{}if(ao){const bad=ao.find(r=>r&&r.error&&/提交失败|保存失败|操作失败|系统错误|发生异常|不能提交/.test(r.error));if(bad)throw Error(bad.error);const good=ao.find(r=>r&&r[alt.flag]);if(good)return good;}}const hit=out.find(r=>r.seen!==undefined);if(hit){if(hit.seen)seen=true;if(hit.closedNoToast)noToast=true;if(typeof hit.buttons==='number')btn=hit.buttons;if(hit.clickedButOpen){clicked=true;if(hit.diag)cdiag=hit.diag;}}const miss=out.find(r=>r.mismatch);detail=miss?.mismatch?.join('、')||'';if(miss&&typeof miss.filled==='number')detail+=(detail?'；':'')+'已联动 '+miss.filled+'/12 个字段';if(onTick&&++ticks%20===0){try{await onTick(detail,miss);}catch{}}await pause(120);}throw Error(label+'（已等待'+Math.round(budget/1000)+'秒，'+(['confirmSubmit','submissionComplete'].includes(command.type)?'提交结果不明，勿重复提交':'未提交')+'）'+(command.type==='confirmSubmit'?(seen?(noToast?'；已点「确定」、确认框已关闭，但没有看到“提交成功”，调整单标签也没有自动关闭':clicked?'；已点击“确定”，但弹窗仍未关闭（'+(cdiag||'无诊断信息')+'）':'；弹窗已出现，但未识别到唯一的“确定”按钮（候选 '+btn+' 个）'):'；没有看到确认弹窗'):'')+(detail?'；未匹配字段：'+detail:['confirmSubmit','submissionComplete'].includes(command.type)?'；请人工回查原站状态。':'；请在原站打开物流状态调整单并确认字段出现后重试。'));}
+async function waitSource(command,flag,label,generation,onTick,budget=60000,alt,onWrongTab){const end=Date.now()+budget;let detail='',holes=0,ticks=0,altTicks=0,seen=false,btn=-1,clicked=false,cdiag='',noToast=false;while(Date.now()<end){if(generation!==undefined&&generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');const out=await run(command);if(out.some(r=>r.timeout)){if(++holes>=4)throw Error('原站页面连续无响应（约30秒），已停止操作'+(['confirmSubmit','submissionComplete'].includes(command.type)?'；提交已发出，结果不明，勿重复提交':generation!==undefined?'；原站尚未提交':'')+'。请检查原站是否卡在弹窗或加载中。');await pause(120);continue;}holes=0;const error=out.find(r=>r.error);if(error)throw Error(error.error);if(onWrongTab&&out.some(r=>r&&r.wrongTab)){await onWrongTab();continue;}let done=out.filter(r=>r[flag]);if(done.length>1&&command.kind==='flow')done=[done[0]];else if(done.length>1)throw Error('发现多个匹配页面，停止操作。');if(done.length===1)return done[0];if(alt&&++altTicks%4===0){let ao=null;try{ao=await run(alt.command);}catch{}if(ao){const bad=ao.find(r=>r&&r.error&&/提交失败|保存失败|操作失败|系统错误|发生异常|不能提交/.test(r.error));if(bad)throw Error(bad.error);const good=ao.find(r=>r&&r[alt.flag]);if(good)return good;}}const hit=out.find(r=>r.seen!==undefined);if(hit){if(hit.seen)seen=true;if(hit.closedNoToast)noToast=true;if(typeof hit.buttons==='number')btn=hit.buttons;if(hit.clickedButOpen){clicked=true;if(hit.diag)cdiag=hit.diag;}}const miss=out.find(r=>r.mismatch);detail=miss?.mismatch?.join('、')||'';if(miss&&typeof miss.filled==='number')detail+=(detail?'；':'')+'已联动 '+miss.filled+'/12 个字段';if(onTick&&++ticks%20===0){try{await onTick(detail,miss);}catch{}}await pause(120);}throw Error(label+'（已等待'+Math.round(budget/1000)+'秒，'+(['confirmSubmit','submissionComplete'].includes(command.type)?'提交结果不明，勿重复提交':'未提交')+'）'+(command.type==='confirmSubmit'?(seen?(noToast?'；已点「确定」、确认框已关闭，但没有看到“提交成功”，调整单标签也没有自动关闭':clicked?'；已点击“确定”，但弹窗仍未关闭（'+(cdiag||'无诊断信息')+'）':'；弹窗已出现，但未识别到唯一的“确定”按钮（候选 '+btn+' 个）'):'；没有看到确认弹窗'):'')+(detail?'；未匹配字段：'+detail:['confirmSubmit','submissionComplete'].includes(command.type)?'；请人工回查原站状态。':'；请在原站打开物流状态调整单并确认字段出现后重试。'));}
 async function clearQueryTags(){
  for(let i=0;i<8;i++){
   const out=await run({type:'clearTags'});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
@@ -990,7 +990,11 @@ mark('portal');
     await waitSource({type:'armSubmission',order:{id:msg.id},target:msg.from},'armed','原站门户提交上下文未就绪',undefined,undefined,60000,undefined,()=>ensurePortalPage('form',stage));
     try{await run({type:'toastMark'});}catch{}
     const out=await run({type:'submitBare',order:{id:msg.id},target:msg.from,expect:msg.to});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);
-    if(!out.some(r=>r.submitted))throw Error('原站表单不匹配或提交结果不明，未改回。');
+    if(!out.some(r=>r.submitted)){
+     // 只有注入脚本 8 秒没回话时才可能已经点了提交；调整单不在前台、表单还没就绪都发生在点击之前
+     if(out.some(r=>r&&r.timeout))throw Error('原站 8 秒没有响应，改回是否已提交不确定（结果不明），勿重复改回，请稍后到原站核对。');
+     throw Error(out.some(r=>r&&r.wrongTab)?'“物流状态调整单”不在门户前台，未提交，未改回。':'原站表单还没准备好，未提交，未改回。');
+    }
     stage('等待原站点“确定”…');
     // 与批量改状态同一判据：点「确定」后新出现“提交成功”，或调整单标签自动关闭；都没有就报结果不明
     const rs=Date.now(),rtoken='r'+rs.toString(36)+Math.random().toString(36).slice(2,6);
@@ -998,7 +1002,11 @@ mark('portal');
     try{
      const hit=await confirmPatiently({type:'confirmSubmit',order:{id:msg.id},target:msg.from,token:rtoken},'原站提交确认未完成',undefined,{command:{type:'submissionComplete',order:{id:msg.id},target:msg.from,token:rtoken},flag:'submissionComplete'},stage);
      await waitDoneSignals(hit,rs,stage);
-    }catch(e){throw Error(/结果不明/.test(e.message)?e.message:e.message+'；改回提交已发出，结果不明，勿重复改回。');}
+    }catch(e){
+     // 原站明确拒绝（数据不完整、提交失败）= 没改成，照原样报；其余情况提交已发出，按结果不明处理
+     if(/结果不明/.test(e.message)||/原站拒绝提交|本单未提交|未改成功|原站返回失败提示/.test(e.message))throw e;
+     throw Error(e.message+'；改回提交已发出，结果不明，勿重复改回。');
+    }
     return {submitted:true,from:cur,to:msg.from,basis:'提交成功+调整单自动关闭'};
    }
    if(msg.type==='notices'){

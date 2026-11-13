@@ -380,11 +380,10 @@ main{max-width:none}
 .history-status-mode{display:inline-flex;align-items:center;gap:10px;font-size:12px;white-space:nowrap}
 .history-status-mode label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
 /* v1.0.17：页面字号用 body 的 zoom 实现（默认 30 → 约 2.14 倍）。Chromium 128 起 vw/vh 也会乘上 zoom，
-   94vw 实际变成 2 倍屏宽，弹窗和冻结表头区域会超出屏幕。--z 由 live.js 写入（字号 / 14），视口相关的上限都除以它。 */
+   94vw 实际变成 2 倍屏宽，弹窗会超出屏幕。--z 由 live.js 写入（字号 / 14），弹窗与提示条的视口上限除以它。
+   主列表区（.parcel-panel）在第 18 行已设为不限高、整页滚动，不能在这里加上限，否则行会溢出到页脚上。 */
 dialog{max-width:calc(94vw / var(--z,1));max-height:calc(100vh / var(--z,1) - 24px);overflow:auto}
 .print-dialog{max-width:calc(96vw / var(--z,1))}
 #changeDialog{max-height:calc(100vh / var(--z,1) - 28px)}
 #toast{max-width:calc(90vw / var(--z,1))}
 .diagnose-text{max-height:calc(44vh / var(--z,1))}
-.table-wrap.frozen-header{max-height:calc(65vh / var(--z,1))}
-.parcel-panel{max-height:calc(78vh / var(--z,1))}
