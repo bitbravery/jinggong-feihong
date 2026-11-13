@@ -8,7 +8,7 @@ assert(live.includes("(flowTab==='已办'?"),'“实际状态回查”按钮只�
 assert(live.includes("flowTab!=='已办'"),'非已办点了也要拦住');
 assert(/bar\.max=m\.total\|\|1/.test(live),'回查要有进度条');
 assert(/已回查 '\+m\.done\+'\/'\+m\.total/.test(live),'回查要显示 k/n');
-assert(/const fail=\(synced&&synced\.failures\)\|\|\[\]/.test(live),'回查要读后台 failures 并列出没查到的单');
+assert(/fail\.push\(\.\.\.synced\.failures\)/.test(live)&&/const failIds=fail\.map/.test(live),'回查要读后台 failures 并列出没查到的单');
 assert(worker.includes('failures.push({id,reason:lastErr'),'后台要把没查到的单收集起来');
 assert(/attempt<2/.test(worker),'单号一次没查到要重试一次');
 

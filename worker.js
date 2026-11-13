@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.16';
+const COMPONENT_VERSION = '1.0.17';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -110,6 +110,8 @@ async function formOrder(id){
  }catch{}
  if(!last)throw Error('未能读取原站调整单内容。');
  if(last.dh!==id)throw Error('原站调整单单号未生效（当前“'+last.dh+'”），未读取到状态。');
+ // v1.0.17：联系人一个都没联动出来时，“当前状态”只是新表单默认勾的第一项，不是这一单的真实状态
+ if(!last.fields||(!last.fields.JJRXM&&!last.fields.SJRXM))throw Error('原站调整单没有联动出这一单的订单信息（寄件人/收件人都为空），读不到真实状态。');
  if(!SourceMapping.statuses.includes(last.current))throw Error('原站当前物流状态无法识别：'+(last.current||'空'));
  const F=last.fields;
  return {id,status:last.current,sender:F.JJRXM,personId:F.JJRGH,phone:F.JJRDH,fromCampus:F.JJDZXQ,building:F.JJDZYL,room:F.JJDZFJH,receiver:F.SJRXM,receiverPhone:F.SJRDH,toCampus:F.SJXQDZ,destinationBuilding:F.SJDZYL,destinationRoom:F.SJDZFJH,duplicateOrder:false};
@@ -473,10 +475,11 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
     if(msg.type==='pageFont'){
      const key='feihongPageFont';
      if(msg.action==='get'){
-      try{const o=await chrome.storage.local.get(key);const px=Number(o&&o[key]);return {px:Number.isFinite(px)&&px>=10&&px<=26?px:null};}catch{return {px:null};}
+      try{const o=await chrome.storage.local.get(key);const px=Number(o&&o[key]);return {px:Number.isFinite(px)&&px>=10&&px<=40?px:null};}catch{return {px:null};}
      }
      if(msg.action==='set'){
-      const px=Math.min(26,Math.max(10,Math.round(Number(msg.px)||14)));
+      // v1.0.17：与工作台一致（10–40，默认 30）；原来上限 26，默认 30 只在首次生效
+      const px=Math.min(40,Math.max(10,Math.round(Number(msg.px)||30)));
       try{await chrome.storage.local.set({[key]:px});}catch{}
       return {px};
      }
@@ -677,8 +680,11 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
      const first=await readPage('first');return {...first,dateRange:range,scope:'下单时间 '+range.from+' 至 '+range.to+'，所有物流状态'};
    }
     if(msg.type==='syncFlowStatus'){
- const ids=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)).slice(0,300):[];
+ const valid=Array.isArray(msg.ids)?msg.ids.filter(x=>/^JGKD\d+$/.test(x)):[];
+ const ids=valid.slice(0,300);
  const statuses={},failures=[];
+ // 一次最多 300 个；超出的不能悄悄丢掉，记进失败清单（工作台正常按 200 个一批发，不会走到这里）
+ for(const id of valid.slice(300))failures.push({id,reason:'超出单次 300 个上限，本次未查'});
  const batchEnd=Date.now()+15*60*1000;let consecutive=0;
  try{
   // 只要原站有「快件查询」就能查；其他页面开没开、关没关都不管
@@ -712,13 +718,14 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    }
    if(!ok)failures.push({id,reason:lastErr||'未查到'});
    consecutive=ok?0:consecutive+1;
-   try{chrome.runtime.sendMessage({type:'statusSync',done:i+1,total:ids.length,id,status:statuses[id]||'',ok}).catch(()=>{});}catch{}
+   // 工作台按 200 个一批发来：进度按整批换算（offset=本批之前已发的个数，grand=总数）
+   try{chrome.runtime.sendMessage({type:'statusSync',done:(Number(msg.offset)||0)+i+1,total:Number(msg.grand)||ids.length,id,status:statuses[id]||'',ok}).catch(()=>{});}catch{}
   }
  }finally{
   // 批量全部查完，最后统一“先点红色错号、再点关闭查询”
   try{await closeQueryPanel();}catch{}
  }
- return {statuses,total:ids.length,done:Object.keys(statuses).length,failures};
+ return {statuses,total:valid.length,done:Object.keys(statuses).length,failures};
 }
 if(msg.type==='statusPreflight'){
      const readPortal=async()=>{const out=await run({type:'portalState'});const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法读取原站状态。');return found[0];};

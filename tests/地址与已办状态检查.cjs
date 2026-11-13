@@ -19,7 +19,7 @@ assert(w.includes("waitSource({type:'queryField',id}"),'核对要回快件查询
 assert(!live.includes("if(flowTab==='已办'&&fresh.length)"),'读取时只读取，不再自动回查状态');
 assert(live.includes('data-sync'),'“实际状态回查”按钮要放进流程标签行');
 assert(live.includes('runSyncFlowStatus'),'点击后才回查');
-assert(live.includes("request({type:'syncFlowStatus',ids})"),'点击后才调用回查命令');
+assert(live.includes("request({type:'syncFlowStatus',ids:part,offset:i,grand:ids.length})"),'点击后才调用回查命令（v1.0.17：按 200 个一批）');
 assert(live.includes("statusSource:'query'"),'回查到的行要标来源');
 assert(live.includes("m.type==='statusSync'"),'要显示回查进度');
 assert(w.includes("ensurePortalPage('query')"),'回查前只要确保「快件查询」标签（其他页面开没开不管）');

@@ -73,31 +73,42 @@ const PageFont={key:'feihong-page-font',migratedKey:'feihong-page-font-default-3
 window.FeiHongPageFont=PageFont;
 function orders(){return records[kind()];}
 function filtered(){const selectedDirection=$('direction').value;const column=CampusPerspective.columns(campus).find(c=>c.key===activeColumn)||CampusPerspective.columns(campus)[0];const f={status:'all',direction:'all',identity:$('identity').value,region:$('region').value,search:$('search').value,officeKeywords};return FeiHong.queryRows(orders().filter(o=>matches(o,f,mappings)&&CampusPerspective.includes(o,campus,selectedDirection)&&(currentView==='flow'?o.flow===flowTab&&o.fromCampus===campus:CampusPerspective.matchesColumns(o,campus,activeColumns,mappings))),{day:$('orderDay').value,sort:sortColumn,descending:sortDescending});}
-function mergeParsed(parsed,kind,flowTab){
+// replace=true：本次读到的是该分类的完整列表（如待办全部在一页里），旧行里本次没出现的视为已离开该分类，移除
+function mergeParsed(parsed,kind,flowTab,{replace=false}={}){
  const isFlow=kind==='flow'&&flowTab;
  const oldRows=isFlow?records.flow.filter(o=>o.flow===flowTab):records[kind];
  const others=isFlow?records.flow.filter(o=>o.flow!==flowTab):[];
  const key=o=>o.id+'|'+(SourceMapping.fingerprint?SourceMapping.fingerprint(o):'');
  const map=new Map();for(const o of oldRows)map.set(key(o),o);
+ const seen=new Map();
  let added=0,updated=0;
- for(const n of parsed){const k=key(n),prev=map.get(k);if(!prev){map.set(k,n);added++;}else{updated++;map.set(k,{...prev,...n,history:prev.history||n.history,recordKey:prev.recordKey});}}
- const rows=[...map.values()];
+ for(const n of parsed){const k=key(n),prev=map.get(k);if(!prev){map.set(k,n);seen.set(k,n);added++;}else{updated++;
+  // v1.0.17：原站“已办”列表的物流状态一律显示订单申请；已用「实际状态回查」查到的真实状态不能被重读覆盖
+  const keepQuery=prev.statusSource==='query'&&n.sourceKind==='flow'&&n.flow==='已办';
+  const merged={...prev,...n,history:prev.history||n.history,recordKey:prev.recordKey,...(keepQuery?{status:prev.status,statusSource:prev.statusSource}:{})};
+  map.set(k,merged);seen.set(k,merged);}}
+ const removed=replace?oldRows.filter(o=>!seen.has(key(o))).length:0;
+ const rows=replace?[...seen.values()]:[...map.values()];
  if(isFlow)records.flow=[...others,...rows];else records[kind]=rows;
- return {rows,added,updated,oldCount:oldRows.length,others,isFlow};
+ return {rows,added,updated,removed,oldCount:oldRows.length,others,isFlow};
 }
+// 待办读到的是第 1 页且原站总数 = 本页行数：这就是待办的全部，可以整类替换（通过/退回后的单才会从本地待办消失）
+function wholeTodo(s){return !!s&&s.kind==='flow'&&s.flowTab==='待办'&&(s.page||1)===1&&Number.isInteger(s.total)&&Array.isArray(s.rows)&&s.rows.length===s.total;}
+let lastReadIds=null;
 function setSnapshotExtra(s,{singlePage=false}={}){
  lastReadError='';
  const parsed=SourceMapping.normalize(s);
- const m=mergeParsed(parsed,s.kind,s.flowTab);
+ lastReadIds={kind:s.kind,flowTab:s.flowTab||'',ids:new Set(parsed.map(o=>o.id)),whole:wholeTodo(s)};
+ const m=mergeParsed(parsed,s.kind,s.flowTab,{replace:wholeTodo(s)});
  snapshots[s.kind]={...s,rows:m.rows,total:m.rows.length,pageSize:singlePage?null:s.pageSize,merged:m.oldCount>0,mergeAdded:m.added,mergeUpdated:m.updated,mergeOld:m.oldCount};
  return {first:m.oldCount===0,added:m.added,updated:m.updated,total:m.rows.length,rows:m.rows};
 }
 // 所有读取都做加法：旧记录保留，本次新出现的追加，同一条用新数据更新
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.16')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.17')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
- if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
+ if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
    if(kind()==='query'&&(!s.rows||s.rows.length===0)){
      const keep=records.query.length>0;
@@ -362,7 +373,10 @@ async function readFlows(pages=5){
    Object.assign(readProgress,{rows:p.rowsRead,total:target??p.total,page:p.page,pages:pagesTarget,percent,note:p.tab});
    drawReadProgress();$('bulkBar').max=100;$('bulkBar').value=percent;
   }});
-  const fresh=parts.flatMap(p=>SourceMapping.normalize(p));const agg=mergeParsed(fresh,'flow',flowTab);
+  const fresh=parts.flatMap(p=>SourceMapping.normalize(p));
+  // 待办全部读完（读到的行数 = 原站总数）时整类替换，已通过/退回的单不再留在本地待办
+  const whole=flowTab==='待办'&&parts.length===1&&Number.isInteger(parts[0].total)&&parts[0].rows.length===parts[0].total;
+  const agg=mergeParsed(fresh,'flow',flowTab,{replace:whole});
   // v0.9.206：原站把“已办”的状态一律写成订单申请，必须回「快件查询」核对真实状态
 
   snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,pageSize:null,total:records.flow.length,rows:parts.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:parts.reduce((n,p)=>n+p.pagesRead,0),pageCount:parts.reduce((n,p)=>n+p.pageCount,0),scope:'流程（前 '+pages+' 页）',mergeAdded:agg.added,mergeUpdated:agg.updated};
@@ -497,11 +511,20 @@ async function runSyncFlowStatus(){
  $('bulkProgress').hidden=false;$('bulkBar').max=ids.length;$('bulkBar').value=0;
  $('bulkText').textContent='正在到「快件查询」回查实际状态 0/'+ids.length+'…';$('bulkCount').textContent='已回查 0/'+ids.length+' 单';drawReadProgress();
  try{
-  const synced=await request({type:'syncFlowStatus',ids});
-  let n=0;const got=(synced&&synced.statuses)||{};
+  // v1.0.17：按 200 个一批发（后台一次最多 300 个），超过的不再被悄悄丢掉
+  const got={},fail=[];
+  for(let i=0;i<ids.length;i+=200){
+   const part=ids.slice(i,i+200);
+   const synced=await request({type:'syncFlowStatus',ids:part,offset:i,grand:ids.length});
+   Object.assign(got,(synced&&synced.statuses)||{});
+   if(synced&&Array.isArray(synced.failures))fail.push(...synced.failures);
+  }
+  // 返回里既没状态也没进失败清单的单号，同样记为没查到
+  for(const id of ids)if(!got[id]&&!fail.some(f=>f.id===id))fail.push({id,reason:'后台未返回'});
+  let n=0;
   records.flow=records.flow.map(o=>o.flow==='已办'&&got[o.id]?(n++,{...o,status:got[o.id],statusSource:'query'}):o);
   $('bulkBar').value=ids.length;
-  const fail=(synced&&synced.failures)||[],failIds=fail.map(f=>f.id);
+  const failIds=fail.map(f=>f.id);
   $('bulkText').textContent='实际状态回查完成：'+n+'/'+ids.length+' 单'+(failIds.length?'；没查到：'+failIds.slice(0,6).join('、')+(failIds.length>6?' 等':'')+'（可稍后再点一次）':'');
   $('bulkCount').textContent='已回查 '+n+'/'+ids.length+' 单';
   render();
@@ -552,19 +575,28 @@ $('rows').addEventListener('click',e=>{
 });
 $('selectAll').onchange=e=>{for(const o of filtered().slice((localPage-1)*LOCAL_PAGE_SIZE,localPage*LOCAL_PAGE_SIZE).filter(o=>!o.duplicateOrder)){if(e.target.checked)selected.add(o.id);else selected.delete(o.id);}render();};async function bulkApprove(action){
  const ids=[...selected];
- if(!ids.length)return;
+ if(!ids.length||busy)return;
  const label=action==='reject'?'退回':'通过';
  if(!confirm('将对选中的 '+ids.length+' 单执行「'+label+'」，确认继续？'))return;
+ if(busy)return;
+ // v1.0.17：执行期间占住工作台，避免连点两次把同一批单发两次
+ busy=true;render();
  try{
   const pageRows=filtered().slice((localPage-1)*LOCAL_PAGE_SIZE,localPage*LOCAL_PAGE_SIZE);const indexOf=id=>{const i=pageRows.findIndex(o=>o.id===id);return i>=0?i+1:0;};
  const recOf=id=>{const arr=filtered();return arr.find(o=>o.id===id)||{};};
  const items=ids.map(id=>{const o=recOf(id);return {id,index:indexOf(id),sender:o.sender||'',receiver:o.receiver||''};});
  const r=await request({type:'bulkApprove',ids,items,action});
   toast('已在原站对 '+r.count+' 单执行「'+r.action+'」'+(r.confirmed?'（已确认）':'（未见确认弹窗）')+'，正在刷新列表…');
-  selected.clear();render();
-  // 刷新待办后核对：所选单号还在「待办」里，说明原站没有真正处理
-  setTimeout(async()=>{if(busy)return;try{await read();}catch{return;}const left=ids.filter(id=>records.flow.some(o=>o.id===id&&o.flow==='待办'));toast(left.length?('注意：原站「待办」当前页仍有 '+left.length+' 单：'+left.join('、')+'，请到原站核对是否已'+label+'。'):('已核对：所选 '+ids.length+' 单已不在原站「待办」当前页。'),left.length?30000:6000);},900);
+  selected.clear();busy=false;render();
+  // 刷新待办后核对：只看这次从原站读回来的待办行（本地合并的旧行不算），所选单号还在说明原站没有真正处理
+  setTimeout(async()=>{if(busy)return;try{await read();}catch{return;}
+   const got=lastReadIds;
+   if(!got||got.kind!=='flow'||got.flowTab!=='待办'){toast('已'+label+'，但刷新原站「待办」没有成功，请到原站核对这 '+ids.length+' 单。',20000);return;}
+   const left=ids.filter(id=>got.ids.has(id));
+   const scope=got.whole?'原站「待办」':'原站「待办」当前页';
+   toast(left.length?('注意：'+scope+'仍有 '+left.length+' 单：'+left.join('、')+'，请到原站核对是否已'+label+'。'):('已核对：所选 '+ids.length+' 单已不在'+scope+'。'),left.length?30000:6000);},900);
  }catch(err){toast('批量'+label+'失败：'+err.message);}
+ finally{if(busy){busy=false;render();}}
 }
 $('batchApprove').onclick=()=>bulkApprove('approve');
 $('batchReject').onclick=()=>bulkApprove('reject');
@@ -706,7 +738,7 @@ async function pumpStatus(){
     try{
      for(let i=0;i<ids.length;i+=200){
       if(btn)btn.textContent='快速查询中 '+Math.min(i+200,ids.length)+'/'+ids.length;
-      const r=await request({type:'syncFlowStatus',ids:ids.slice(i,i+200)});
+      const r=await request({type:'syncFlowStatus',ids:ids.slice(i,i+200),offset:i,grand:ids.length});
       Object.assign(got,(r&&r.statuses)||{});
       if(r&&Array.isArray(r.failures))fails.push(...r.failures);
      }
