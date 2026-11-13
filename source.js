@@ -624,6 +624,13 @@ function sourceAction(command){
    });
    return {frameProbe:true,path:location.pathname,top:window===top,ready:document.readyState,hasMyTodo:body.includes('我的待办'),hasMyService:body.includes('我的服务'),kj:kj.length,kjVisible:kj.filter(el=>fhVis(el)).length,sample:kj.slice(0,6).map(el=>text(el).slice(0,24))};
   }
+  // v1.0.23 诊断（不改行为）：原站标签页此刻在前台还是后台、已在后台多久。
+  // 现场：批量中途失败，用户切到原站标签页后剩下的单就都顺利了——怀疑浏览器对后台标签页限速/休眠导致门户切标签、加载变慢。
+  if(command.type==='pageVisibility'){
+   if(window!==top)return null;
+   try{if(!window.__fhVisHooked){window.__fhVisHooked=1;window.__fhHiddenSince=document.hidden?Date.now():0;document.addEventListener('visibilitychange',()=>{window.__fhHiddenSince=document.hidden?Date.now():0;});}}catch{}
+   return {pageVisibility:true,hidden:!!document.hidden,hiddenFor:document.hidden&&window.__fhHiddenSince?Date.now()-window.__fhHiddenSince:0,known:!!window.__fhHiddenSince||!document.hidden};
+  }
   if(command.type==='pressInfo'){
    if(window!==top)return null;
    const L=window.__fhPressLog;if(!L||L.token!==command.token)return {pressInfo:true,count:0};

@@ -25,6 +25,7 @@ c2.f('P').then(text=>{
  assert.equal(text,'点「确定」2 次（间隔 1.5 秒）；浏览器网络请求记录 250 条（已满 250 条，“已点过就别再点”的判断失效）');
  const live=fs.readFileSync(__dirname+'/../live.js','utf8');
  assert(/row\.presses=submitted\.presses/.test(live)&&/h\.presses\|\|''/.test(live)&&/'点确定记录'\]/.test(live),'历史详情与复制修改信息要带点确定记录');
- assert(/presses:await pressNote\(confirmToken\)/.test(worker),'成功结果要带点确定记录');
+ // v1.0.23 起成功结果里点确定记录后面还跟着原站前后台状态
+ assert(/presses:\[?await pressNote\(confirmToken\)/.test(worker),'成功结果要带点确定记录');
  console.log('通过：记录点确定次数、间隔、请求记录条数（满 250 条点明失效），并写进历史与复制修改信息。');
 }).catch(e=>{console.error(e);process.exitCode=1;});
