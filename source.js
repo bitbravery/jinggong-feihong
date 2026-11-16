@@ -827,9 +827,17 @@ function sourceAction(command){
    let scope=document.body;
    const panel=Array.from(document.querySelectorAll('.mini-panel,.mini-window,div')).find(el=>vis(el)&&/条件字段/.test(text(el))&&/关闭查询/.test(text(el)));
    if(panel)scope=panel;
-   const condRows=Array.from(scope.querySelectorAll('tr[id^="line_"]')).filter(vis);
-   const delLinks=condRows.map(row=>row.querySelector&&row.querySelector('a[onclick^="delete_search"],a[onclick*="delete_search"]')).filter(Boolean);
+   const condRows=Array.from(scope.querySelectorAll('tr[id^="line_"]')).filter(r=>vis(r)&&/^line_/.test(String(r.id||'')));
+   // v1.0.25：原站的条件行永远至少剩一行，最后一行的红色错号点了也不会消失（用户现场截图）。
+   // 只点还有内容的行；所有行都空了就直接点「关闭查询」，不再对着最后那个空行反复点错号。
+   const filled=row=>{const ins=Array.from(row.querySelectorAll('input')).filter(i=>String(i.type||'text').toLowerCase()!=='hidden');const shown=ins.filter(i=>/\$text$/.test(i.id||''));return (shown.length?shown:ins).some(i=>String(i.value||'').trim());};
+   const delLinks=condRows.filter(filled).map(row=>row.querySelector&&row.querySelector('a[onclick^="delete_search"],a[onclick*="delete_search"]')).filter(Boolean);
    if(delLinks.length){shoot(delLinks[0]);return {cleared:1,more:delLinks.length-1,closed:false};}
+   if(condRows.length){
+     const closeBtn=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
+     if(closeBtn){shoot(closeBtn);return {closed:true,cleared:0,label:text(closeBtn).slice(0,20)};}
+     return {error:'查询条件已清空，但没找到「关闭查询」按钮，请在原站手动点一下。'};
+   }
    // 兜底：认得出“×”文字/图标时，先点掉再关（保持老门户兼容）
    const closeEl=Array.from(document.querySelectorAll('button,a,span,div')).filter(vis).filter(el=>/关闭查询/.test(text(el))&&text(el).length<=14).sort((a,b)=>a.getBoundingClientRect().width-b.getBoundingClientRect().width)[0];
    let xscope=closeEl;
