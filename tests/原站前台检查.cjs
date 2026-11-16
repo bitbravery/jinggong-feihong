@@ -52,6 +52,7 @@ const failingPortal=async c=>{if(c.type==='portalState')return [{tabs:['工作�
   '历史查看原站状态':/statusBusy=true;\s*await portalFront\(true\);/,
   '近一个月/自定义时段':/await portalFront\(true\);\s*const complete=await FeiHongBulk\.scanAll/,
   '流程读取前 N 页':/await portalFront\(true\);\s*const parts=await FeiHongBulk\.scanFlows/,
+  '读取当前页（快件查询、待办、已办）':/withPortalFront\(\(\)=>request\(\{type:'read',kind:kind\(\),flowTab\}\)\)/,
  };
  for(const [k,re] of Object.entries(need))assert(re.test(live),k+' 没有在长操作期间把原站切到前台');
  assert(/badge\(\(batchIndex\+'\/'\+batchTotal\)\.length<=4\?/.test(live),'图标进度超过 4 个字时要改成只显示第几单');
