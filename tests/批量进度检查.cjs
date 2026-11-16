@@ -10,7 +10,8 @@ assert(/batchIndex=orderIndex\+1;batchTotal=targets\.length;/.test(live),'缺少
 assert(/for\(let orderIndex=0;orderIndex<targets\.length;orderIndex\+\+\)\{/.test(live),'批量循环必须逐单可中断');
 
 const i=live.indexOf('for(let orderIndex=0;');
-const seg=live.slice(i, i+4000);
+// 循环体随版本变长（v1.0.22 加了原站拒收分支），按整个循环取
+const seg=live.slice(i, live.indexOf("const elapsed=(performance.now()-batchStartedAt)",i));
 assert(/catch\(err\)\{/.test(seg),'单次失败必须被捕获，而不是中断整批');
 assert(/failures\.push\(order\.id\)/.test(seg),'失败单号要记录下来');
 assert(/setOrderState\(order\.id,'失败','bad'\)/.test(seg),'失败单要标红');

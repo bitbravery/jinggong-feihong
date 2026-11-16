@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.23';
+const COMPONENT_VERSION = '1.0.24';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -391,6 +391,20 @@ const FORM_READY_WAIT=30000;
 // 原站是否正在“加载中”（点「确定」后保存期间整页蒙灰；v0.9.178 现场截图）
 // 诊断：本单点了几次「确定」、间隔多久、浏览器网络请求记录有多少条（满 250 条时“已点过就别再点”的判断会失效）
 async function pressNote(token){try{const p=(await run({type:'pressInfo',token})).find(r=>r&&r.pressInfo);if(!p)return '';if(!p.count)return '没有记录到点「确定」';return '点「确定」'+p.count+' 次'+(p.gaps&&p.gaps.length?'（间隔 '+p.gaps.join('、')+' 秒）':'')+(p.mini?'，含一次控件点击事件':'')+'；浏览器网络请求记录 '+p.buf+' 条'+(p.buf>=250?'（已满 250 条，“已点过就别再点”的判断失效）':'');}catch{return '';}}
+// v1.0.24：浏览器会给后台标签页限速（Edge 还会让它休眠），门户切标签、加载调整单都靠页面里的定时器和渲染，
+// 原站在后台时就会慢到超时——这是“网不好时批量大片失败、先刷新原站会好些、切过去看一眼又好了”的原因。
+// 长操作期间把原站标签页（连同它的窗口）切到前台；做完由工作台切回来。
+let frontReturnTab=null;
+async function bringPortalFront(){
+ try{
+  const {sourceTabId}=await chrome.storage.session.get('sourceTabId');if(!sourceTabId)return false;
+  const tab=await chrome.tabs.get(sourceTabId);
+  if(!tab.active)await chrome.tabs.update(sourceTabId,{active:true});
+  if(chrome.windows&&chrome.windows.update)try{await chrome.windows.update(tab.windowId,{focused:true});}catch{}
+  if(!tab.active)await pause(300); // 刚从后台/休眠回来，给页面一点时间恢复
+  return true;
+ }catch{return false;}
+}
 // v1.0.23 诊断：原站标签页在前台还是后台（只记录，不改行为）
 async function visNote(){try{const out=await Promise.race([run({type:'pageVisibility'}),pause(1500).then(()=>[])]);const v=out.find(r=>r&&r.pageVisibility);if(!v)return '';return v.hidden?'原站标签页在后台'+(v.hiddenFor?'（已 '+Math.round(v.hiddenFor/1000)+' 秒）':''):'原站标签页在前台';}catch{return '';}}
 async function portalSaving(){try{return (await run({type:'portalBusy'})).some(r=>r&&r.busy);}catch{return false;}}
@@ -568,6 +582,13 @@ chrome.runtime.onMessage.addListener((msg,sender,respond)=>{
    if(msg.type==='page'){if(!['next','prev','first'].includes(msg.direction))throw Error('无效分页方向');await navigate('query');return readPage(msg.direction);}
    if(msg.type==='cancelFlow'){flowCancelled=true;return {cancelled:true};}
    if(msg.type==='cancelSync'){syncCancelled=true;return {cancelled:true};}
+   if(msg.type==='portalFront'){
+    if(msg.on){frontReturnTab=sender.tab?.id??frontReturnTab;return {front:await bringPortalFront()};}
+    const back=frontReturnTab??sender.tab?.id;frontReturnTab=null;
+    if(back)try{const t=await chrome.tabs.update(back,{active:true});if(t&&chrome.windows&&chrome.windows.update)await chrome.windows.update(t.windowId,{focused:true}).catch(()=>{});}catch{}
+    return {back:!!back};
+   }
+   if(msg.type==='badge'){try{await chrome.action.setBadgeText({text:String(msg.text||'').slice(0,4)});if(msg.text)await chrome.action.setBadgeBackgroundColor({color:'#146b59'});}catch{}return {ok:true};}
    if(msg.type==='flowFirst'){flowCancelled=false;flowBegin('读取前 N 页（'+msg.flowTab+'）');return flowFirst(msg.flowTab);}
     if(msg.type==='flowDate'){
      if(msg.flowTab)await ensureFlowTab(msg.flowTab);
@@ -799,6 +820,7 @@ if(msg.type==='statusPreflight'){
      const check=()=>{if(generation!==writeGeneration)throw Error('已取消修改；原站尚未提交。');};
      const T0=Date.now(),timing={},mark=k=>{timing[k]=Date.now()-T0;};
      const inventory=async()=>{try{const out=await run({type:'frameReport'});const rows=out.filter(r=>r&&r.path);return rows.map(r=>pageName(r.path)+'（'+(r.ready==='complete'?'已加载':'加载中')+(r.dh?'，有单号框':'')+(r.radios?'，'+r.radios+' 个单选':'')+'）').join('、');}catch{return '';}};
+     if(msg.front)await bringPortalFront();
      try{await run({type:'pageVisibility'});}catch{}
      stage('检查门户标签…');
      const readPortal=async()=>{const out=await run({type:'portalState'});const bad=out.find(r=>r.error);if(bad)throw Error(bad.error);if(out.some(r=>r.timeout))throw Error('原站门户页面无响应（8秒），未开始核对；原站尚未提交。');const found=out.filter(r=>Array.isArray(r.tabs));if(found.length!==1)throw Error('未唯一识别门户页面，无法核对门户标签；请确认原站停在同一门户页。');return found[0];};
@@ -1099,5 +1121,5 @@ if(msg.type==='diagnose'){
    if(msg.type==='openStandardPages')return openStandardPages(sender.tab?.id);
    if(msg.type==='openFlow'){const {sourceTabId}=await chrome.storage.session.get('sourceTabId');await navigate('flow');await chrome.tabs.update(sourceTabId,{active:true});return {opened:true};}
    throw Error('不支持的操作');
- }).then(async data=>{if(['verify'].includes(msg.type)&&sender.tab?.id)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:true,data});}).catch(async e=>{if(['prepare','submit'].includes(msg.type)){const v=await visNote();if(v)e=Object.assign(Error(e.message+'（'+v+'）'),{rejected:e.rejected});}if(['prepare','submit','verify','beginAll'].includes(msg.type)&&sender.tab?.id)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:false,error:e.message});});return true;
+ }).then(async data=>{if(['verify'].includes(msg.type)&&sender.tab?.id&&frontReturnTab===null)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:true,data});}).catch(async e=>{if(['prepare','submit'].includes(msg.type)){const v=await visNote();if(v)e=Object.assign(Error(e.message+'（'+v+'）'),{rejected:e.rejected});}if(['prepare','submit','verify','beginAll'].includes(msg.type)&&sender.tab?.id&&frontReturnTab===null)await chrome.tabs.update(sender.tab.id,{active:true}).catch(()=>{});respond({ok:false,error:e.message});});return true;
 });

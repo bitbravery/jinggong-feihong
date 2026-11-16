@@ -65,6 +65,12 @@ function toast(s,duration=6500){
 }
 async function request(msg){if(!globalThis.chrome?.runtime?.id)throw Error('请按安装说明加载扩展，并从原站点击扩展图标打开；不要双击此HTML。');const r=await chrome.runtime.sendMessage(msg);if(!r?.ok)throw Error(r?.error==='不支持的操作'?'后台组件仍是旧版本：请在 Edge 扩展卡片点圆形箭头重新加载，再回学校页点击扩展图标。仅刷新工作台不会更新后台。':r?.error||'扩展连接已中断，请在原站重新点击扩展图标。');return r.data;}
 function kind(){return currentView==='flow'?'flow':'query';}
+// v1.0.24：浏览器会给后台标签页限速/休眠，原站在后台时门户切标签、加载调整单会慢到超时（批量“网不好时大片失败”的原因）。
+// 长操作期间请后台把原站标签页切到前台，结束后再切回工作台；进度显示在工具栏飞鸿图标上。
+async function portalFront(on){try{await request({type:'portalFront',on});}catch{}}
+function badge(text){try{request({type:'badge',text:text||''}).catch(()=>{});}catch{}}
+// 把一段长操作包起来：开始切到原站，结束（含出错）切回工作台、清掉图标进度
+async function withPortalFront(fn){await portalFront(true);try{return await fn();}finally{badge('');await portalFront(false);}}
 // v1.0.14：页面字号——默认 30（按 14px 为 1.0 缩放整页）；本地立即生效，后台 chrome.storage 持久化
 const PageFont={key:'feihong-page-font',migratedKey:'feihong-page-font-default-30',min:10,max:40,base:14,defaultPx:30,
  readControls(sel,custom){const v=sel&&sel.value==='custom'?Number(custom&&custom.value||this.defaultPx):Number(sel&&sel.value||this.defaultPx);return Math.min(this.max,Math.max(this.min,Math.round(v)||this.defaultPx));},
@@ -125,7 +131,7 @@ function refreshNote(m){if(m.kept)return '这次读到的列表是空的，可�
 // v1.0.22：所有读取都用本次结果刷新（见 mergeParsed）
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.23')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.24')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  const s=await request({type:'read',kind:kind(),flowTab});
@@ -198,13 +204,14 @@ async function submit(e){
  try{pre=await request({type:'statusPreflight'});}
  catch(err){busy=false;writePhase='idle';changeCancelled=false;if(stageTimer){clearInterval(stageTimer);stageTimer=null;}$('closeChange').disabled=false;$('cancelChange').disabled=false;try{$('changeDialog').close();}catch{}render();toast('开始批量修改前检查原站失败：'+err.message,12000);return;}
  if(pre&&pre.closed)toast('已关闭残留的“物流状态调整单” '+pre.closed+' 张。');const submitButton=$('changeForm').querySelector('button[type="submit"],button:not([type])');submitButton.disabled=true;
- const batchStartedAt=performance.now(),batchId='b'+Date.now();$('changeBatchSummary').textContent='正在提交申请，请耐心等待；批量修改期间请勿操作原站或扩展（需要人工清理时按提示操作）。';
+ const batchStartedAt=performance.now(),batchId='b'+Date.now();$('changeBatchSummary').textContent='正在提交申请，请耐心等待。批量期间扩展会把原站页面切到前面（放在后台浏览器会限速，容易失败），请不要切走；进度看工具栏飞鸿图标上的数字，要取消就切回这里点「取消」。';
+ await portalFront(true);
  let doneCount=0;const failures=[];let consecutiveFails=0;const batchRows=[];
  try{
   for(let orderIndex=0;orderIndex<targets.length;orderIndex++){
     if(changeCancelled){setStage('已取消，剩余单未执行');break;}
     const order=targets[orderIndex];
-    batchIndex=orderIndex+1;batchTotal=targets.length;
+    batchIndex=orderIndex+1;batchTotal=targets.length;badge((batchIndex+'/'+batchTotal).length<=4?batchIndex+'/'+batchTotal:String(batchIndex));
     batchLabel=batchIndex+'/'+batchTotal+' '+order.id+' · '+(order.sender||'')+'→'+(order.receiver||'');
     writeStarted=performance.now();
     setOrderState(order.id,'准备中','busy');
@@ -215,7 +222,7 @@ async function submit(e){
    row={id:order.id,from:order.status,to:target,iso:new Date().toISOString(),time:formatTime(new Date()),reason:$('changeReason').value.trim(),result:'正在准备，尚未提交',action:'物流状态调整',sender:order.sender,receiver:order.receiver,fromCampus:order.fromCampus,toCampus:order.toCampus,building:order.building,batchId,batchSize:targets.length};
    audit.push(row);batchRows.push(row);if(!save())throw Error('历史保存失败，未提交。');
    let prep=null;
-   try{prep=await request({type:'prepare',order});}catch(e){row.result=/已取消/.test(e.message)?'已取消，未提交':'准备失败，未提交';row.error=e.message;save();throw e;}
+   try{prep=await request({type:'prepare',order,front:true});}catch(e){row.result=/已取消/.test(e.message)?'已取消，未提交':'准备失败，未提交';row.error=e.message;save();throw e;}
    if(changeCancelled){row.result='已取消，未提交';save();break;}
    row.nameWarn=nameWarning(prep&&prep.names,order);
    // Persist uncertain state before dispatch: a failed response may still have committed.
@@ -230,7 +237,7 @@ async function submit(e){
      row.result='第一次提交未确认（原站状态未变），正在重试一次';save();
      setStage(tagText()+'第一次提交未确认（原站状态未变），正在重试一次');
      try{
-      prep=await request({type:'prepare',order});
+      prep=await request({type:'prepare',order,front:true});
       submitted=await request({type:'submit',order,target});
       if(!submitted?.confirmed)throw Error('尚未确认原站提交弹窗。');
      }catch(e2){
@@ -277,7 +284,7 @@ async function submit(e){
   if(changeCancelled)toast('已取消：成功 '+doneCount+' 单，失败 '+failures.length+' 单，其余未执行',20000);
   else if(failures.length)toast('批量完成：成功 '+doneCount+' 单，失败 '+failures.length+' 单（原因见「状态修改历史」）',20000);
   else toast('已提交 '+targets.length+' 单',1500);
- }catch(e){toast((targets.length>1?'批量改状态：已完成 '+doneCount+'/'+targets.length+' 单，其余未执行；':'')+e.message,20000);$('changeDialog').close();render();}finally{if(stageTimer){clearInterval(stageTimer);stageTimer=null;}busy=false;writePhase='idle';changeCancelled=false;$('cancelChange').disabled=false;$('closeChange').disabled=false;submitButton.disabled=false;submitButton.textContent='提交修改';if(!pending.length){$('cancelChange').textContent='关闭';submitButton.disabled=true;}renderHistory();render();}
+ }catch(e){toast((targets.length>1?'批量改状态：已完成 '+doneCount+'/'+targets.length+' 单，其余未执行；':'')+e.message,20000);$('changeDialog').close();render();}finally{badge('');await portalFront(false);if(stageTimer){clearInterval(stageTimer);stageTimer=null;}busy=false;writePhase='idle';changeCancelled=false;$('cancelChange').disabled=false;$('closeChange').disabled=false;submitButton.disabled=false;submitButton.textContent='提交修改';if(!pending.length){$('cancelChange').textContent='关闭';submitButton.disabled=true;}renderHistory();render();}
 }
 // 姓名核对（仅记录，不拦截）：两个联系人都不一致、且至少有一个能确定不一致时记一笔，供现场评估误报率。
 function nameWarning(n,o){
@@ -389,6 +396,7 @@ async function readFlows(pages=5){
  const timer=setInterval(drawReadProgress,100);
  const tally=tab=>orders().filter(o=>o.flow===tab).length;
  try{
+  await portalFront(true);
   const parts=await FeiHongBulk.scanFlows({pages,tabs:[flowTab],request,isCancelled:()=>bulkCancelled,onProgress:p=>{
    if(p.phase==='switch'){$('bulkText').textContent='正在切换到“'+p.tab+'”…';readProgress.note=p.tab;drawReadProgress();return;}
    const {target,pagesTarget,percent}=flowProgress(p);
@@ -412,7 +420,7 @@ async function readFlows(pages=5){
   if(e.partial&&e.partial.length){const agg=mergeParsed(e.partial.flatMap(p=>SourceMapping.normalize(p)),'flow',flowTab);snapshots.flow={kind:'flow',bulk:true,complete:false,limited:true,page:1,total:records.flow.length,pageSize:null,rows:e.partial.flatMap(p=>p.rows),rowIds:[],headers:[],readAt:new Date().toISOString(),pagesRead:e.partial.reduce((n,p)=>n+p.pagesRead,0),pageCount:e.partial.reduce((n,p)=>n+p.pageCount,0),scope:'流程（未读完）',mergeAdded:agg.added,mergeUpdated:agg.updated};}
   lastReadError=e.message;$('bulkText').textContent=e.message;$('bulkCount').textContent='流程读取未完成';
   toast(e.message);
- }finally{clearInterval(timer);$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readFlows').textContent='读取全部流程';render();}
+ }finally{badge('');await portalFront(false);clearInterval(timer);$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readFlows').textContent='读取全部流程';render();}
 }
 let noticeCache=[];
 function renderNotices(list){
@@ -536,6 +544,7 @@ async function runSyncFlowStatus(){
  try{
   // v1.0.17：按 200 个一批发（后台一次最多 300 个），超过的不再被悄悄丢掉
   const got={},fail=[];
+  await portalFront(true);
   for(let i=0;i<ids.length;i+=200){
    const part=ids.slice(i,i+200);
    if(bulkCancelled){for(const id of ids.slice(i))fail.push({id,reason:'已停止（手动取消）'});break;}
@@ -554,7 +563,7 @@ async function runSyncFlowStatus(){
   render();
   toast(n?('已回查 '+n+'/'+ids.length+' 单实际状态'+(failIds.length?'，'+failIds.length+' 单没查到（'+failIds.slice(0,3).join('、')+(failIds.length>3?' 等':'')+'）':'')+'。'):'没有回查到状态，请确认原站「快件查询」能正常按单号查到。',failIds.length?12000:6000);
  }catch(err){toast('实际状态回查失败：'+err.message,10000);}
- finally{busy=false;$('cancelBulk').disabled=true;setTimeout(()=>{if(!busy)$('bulkProgress').hidden=true;},5000);}
+ finally{badge('');await portalFront(false);busy=false;$('cancelBulk').disabled=true;setTimeout(()=>{if(!busy)$('bulkProgress').hidden=true;},5000);}
 }
 $('flowTools').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.sync!==undefined){runSyncFlowStatus();return;}if(b.dataset.flow){flowTab=b.dataset.flow;toast('已切到“'+flowTab+'”分类，点右上「读取」只读这一类。');}if(b.dataset.person){$('identity').value=b.dataset.person;$('region').value='all';}if(b.dataset.region)$('region').value=b.dataset.region;render();};
 $('overview').onclick=e=>{const b=e.target.closest('[data-column]');if(b){activeColumns=CampusPerspective.toggleColumns(activeColumns,b.dataset.column);activeColumn=[...activeColumns][0];localPage=1;$('direction').value='all';selected.clear();render();}};
@@ -609,7 +618,7 @@ $('selectAll').onchange=e=>{for(const o of filtered().slice((localPage-1)*LOCAL_
   const pageRows=filtered().slice((localPage-1)*LOCAL_PAGE_SIZE,localPage*LOCAL_PAGE_SIZE);const indexOf=id=>{const i=pageRows.findIndex(o=>o.id===id);return i>=0?i+1:0;};
  const recOf=id=>{const arr=filtered();return arr.find(o=>o.id===id)||{};};
  const items=ids.map(id=>{const o=recOf(id);return {id,index:indexOf(id),sender:o.sender||'',receiver:o.receiver||''};});
- const r=await request({type:'bulkApprove',ids,items,action});
+ const r=await withPortalFront(()=>request({type:'bulkApprove',ids,items,action}));
   toast('已在原站对 '+r.count+' 单执行「'+r.action+'」'+(r.confirmed?'（已确认）':'（未见确认弹窗）')+'，正在刷新列表…');
   selected.clear();busy=false;render();
   // 刷新待办后核对：只看这次从原站读回来的待办行（本地合并的旧行不算），所选单号还在说明原站没有真正处理
@@ -747,6 +756,7 @@ function enqueueStatus(rows){
 async function pumpStatus(){
  if(statusBusy)return;
  statusBusy=true;
+ await portalFront(true);
  // 本轮开始时的查询方式；中途切换单选只影响下一轮
  const mode=historyStatusMode;
  const btn=$('batchStatusCheck');if(btn)btn.disabled=true;
@@ -818,6 +828,7 @@ async function pumpStatus(){
   try{save();renderHistory();}catch{}
  }
  finally{
+  badge('');await portalFront(false);
   statusBusy=false;historyRunning='';historyQueued.clear();historySeq.clear();historyTotal=0;
   try{renderHistory();}catch{}
   const btn2=$('batchStatusCheck');if(btn2)btn2.disabled=false;
@@ -873,7 +884,7 @@ $('historyRows').onclick=async e=>{
    const row={id:revertId,from:to,to:from,iso:new Date().toISOString(),time:formatTime(new Date()),reason:'按历史改回原状态',result:'改回进行中，结果待核验',action:'物流状态调整',sender:src?.sender||'',receiver:src?.receiver||'',fromCampus:src?.fromCampus||'',toCampus:src?.toCampus||'',revertOf:key||''};
    audit.push(row);save();
    try{
-    const r=await request({type:'revert',id:revertId,from,to});
+    const r=await withPortalFront(()=>request({type:'revert',id:revertId,from,to}));
     if(r.already){row.result='已取消：原站已是原状态，无需改回（未提交）';row.from=from;save();renderHistory();stage.textContent='原站已经是“'+from+'”，无需改回。';stage.hidden=false;return;}
     row.from=r.from;row.result='已确认提交（'+(r.basis||'未回读')+'）';row.confirmedAt=formatTime(new Date());
     if(src){src.reverted=true;src.revertedAt=formatTime(new Date());}
@@ -918,10 +929,11 @@ $('readAll').onclick=async()=>{
  try{
   const readId=String(Date.now());activeReadId=readId;await requireComponent();
   let verifyAt=0;
+  await portalFront(true);
   const complete=await FeiHongBulk.scanAll({range,request:m=>request({...m,readId}),isCancelled:()=>bulkCancelled,onProgress:p=>{if(p.verifying&&!verifyAt)verifyAt=performance.now();$('bulkText').textContent=(p.verifying?'正在进行首尾复核':'正在读取')+'：'+p.rowsRead+' / '+p.total+' 行，第 '+p.page+' / '+p.pages+' 页';const percent=p.total?Math.min(99,Math.floor(p.rowsRead/p.total*100)):0;$('bulkBar').max=100;$('bulkBar').value=percent;Object.assign(readProgress,{rows:p.rowsRead,total:p.total,page:p.page,pages:p.pages,percent,note:p.verifying?'复核中':''});drawReadProgress();$('bulkCount').textContent='已查询 '+p.rowsRead+' / '+p.total+' 条 · 进度 '+percent+'%'+(p.verifying?' · 正在复核完整性':'');}});
   const mAll=setSnapshot(complete);Object.assign(readProgress,{rows:mAll.total,total:mAll.total,page:complete.pagesRead,pages:complete.pageCount,percent:100,note:'已完成'});$('bulkBar').value=100;$('bulkCount').textContent='已查询 '+mAll.total+' 条 · 进度 100% · 完整性复核通过';$('bulkText').textContent='已完成：'+refreshNote(mAll)+'，'+complete.pagesRead+' 页，'+range.from+' 至 '+range.to+' 所有物流状态。';toast('全部快件页面读取与首尾核对完成：'+refreshNote(mAll)+'，用时 '+((performance.now()-started)/1000).toFixed(1)+' 秒（逐页读取 '+(((verifyAt||performance.now())-started)/1000).toFixed(1)+' 秒，首页复核 '+(verifyAt?((performance.now()-verifyAt)/1000).toFixed(1):'0.0')+' 秒）。');
  }catch(e){if(e.partial?.rows.length){e.partial.complete=false;setSnapshot(e.partial);}lastReadError=e.message;readProgress.note=e.message;$('bulkText').textContent=e.message;if(!$('bulkBar').hasAttribute('value')){$('bulkBar').max=100;$('bulkBar').value=0;$('bulkCount').textContent='已查询 0 条 · 未完成日期筛选或总数确认';}else $('bulkCount').textContent+=' · 批次未完成';toast(e.message);}
- finally{activeReadId=null;clearInterval(elapsedTimer);drawReadProgress();$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readAll').textContent='自定义时段';$('cancelBulk').disabled=true;render();
+ finally{badge('');await portalFront(false);activeReadId=null;clearInterval(elapsedTimer);drawReadProgress();$('bulkElapsed').textContent='耗时 '+((performance.now()-started)/1000).toFixed(1)+' 秒';busy=false;$('bulkProgress').hidden=true;$('readAll').textContent='自定义时段';$('cancelBulk').disabled=true;render();
   // v1.0.21：关原站查询面板可能要切回快件查询、逐个点条件，要好几秒；不再让列表等它，改在后台做（原站操作仍由后台串行队列排队）
   const closeAt=performance.now();
   request({type:'endRead'}).then(r=>!!(r&&r.closed),()=>false).then(closed=>{const sec=((performance.now()-closeAt)/1000).toFixed(1);console.info('[飞鸿] 读取后关闭原站查询面板：'+(closed?'已关闭':'未关上')+'，'+sec+' 秒');if(!closed)toast('原站「快件查询」的查询条件面板没有自动关上（'+sec+' 秒），需要时请在原站点「关闭查询」。');});}
