@@ -686,7 +686,7 @@ function exportPickup(mode){
  if(!m.items){toast('勾选的单子里没有从'+campus+'寄出或寄到'+campus+'的件，没有可导出的。');return;}
  try{localStorage.setItem(PICKUP_MODE_KEY,mode);}catch{}
  const url=URL.createObjectURL(new Blob([createStyledWorkbook(m)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');
- a.href=url;a.download='取送件清单-'+campus+'-'+now.replace(/[-: ]/g,'').slice(0,8)+'-'+now.slice(11,16).replace(':','')+(mode==='building'?'-楼宇优先':'-取送件优先')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ a.href=url;a.download=nextExportName('取送件清单');a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
  $('pickupDialog').close();
  toast('已导出取送件清单：送件 '+m.counts.send+' 件、取件 '+m.counts.take+' 件'+(m.skipped.length?'（'+m.skipped.length+' 件不属于'+campus+'，未导出）':'')+'。',7000);
 }
@@ -721,15 +721,15 @@ function openPrint(id){
  $('printDialog').showModal();
 }
 const PRINT_CSS='@page{size:auto;margin:6mm 3mm 2mm}*{box-sizing:border-box}html,body{width:100%;height:auto}body{width:80%;margin:0 auto;color:#111;font:12px/1.35 "Microsoft YaHei",system-ui,sans-serif}.pf-title{text-align:center;font-size:20px;font-weight:400;letter-spacing:3.8px;width:70%;margin:0 auto 2px}.pf-no{text-align:center;font-size:16.4px;font-weight:400;letter-spacing:0;width:70%;margin:0 auto 6px}.pf-sec{background:#e7ebef;border-left:4px solid #2f6fb3;padding:5px 9px;margin:7px 0 4px;font-size:15px;font-weight:600;page-break-inside:avoid}.pf-table{width:100%;border-collapse:collapse;margin:0 0 4px;table-layout:fixed;page-break-inside:avoid}.pf-table col.c1{width:20%}.pf-table col.c2{width:20%}.pf-table col.c3{width:20%}.pf-table col.c4{width:40%}.pf-table th,.pf-table td{border:1px solid #222;padding:4px 8px;font-size:15px;font-weight:400;height:auto;vertical-align:middle}.pf-table th{white-space:nowrap;text-align:center;background:#fafafa}.pf-table td{text-align:left;overflow-wrap:anywhere}.pf-table tr{page-break-inside:avoid}.pf-tip-title{margin:5px 0 2px;font-size:12px;font-weight:600}.pf-tip{margin:2px 0;font-size:12px;font-weight:400;line-height:1.5}';
-function nextExportName(){
+function nextExportName(prefix='飞鸿清单'){
  const d=new Date();
  const ymd=String(d.getFullYear())+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
- const key='feihong-export-seq-'+ymd;
+ const key='feihong-export-seq-'+(prefix==='飞鸿清单'?'':prefix+'-')+ymd;
  let n=0;
  try{n=Number(localStorage.getItem(key)||'0')||0;}catch{}
  n+=1;
  try{localStorage.setItem(key,String(n));}catch{}
- return '飞鸿清单'+ymd+(n>1?'('+(n-1)+')':'')+'.xlsx';
+ return prefix+ymd+(n>1?'('+(n-1)+')':'')+'.xlsx';
 }
 function printHtml(html){
  const f=document.createElement('iframe');
