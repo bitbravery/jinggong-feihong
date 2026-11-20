@@ -695,9 +695,15 @@ async function readTodoNow(){
 }
 // v1.0.33：快件查询里还只有日期的单，到原站「已办」逐页找下单时分。已有时分的跳过；
 // 找齐、或整页都早于缺时分的最早那天、或翻满 maxPages 页就停。读完把原站【流程】切回「待办」。
+// v1.0.33：已办里只有本窗口校区发出的单；另一校区发出的单去已办找不到，不找。
+// 翻完仍没找到的单号记在本机（DONE_MISS_KEY），以后不再为它们翻已办。
+const DONE_MISS_KEY='feihong-done-time-miss-v1';
+function loadDoneMiss(){try{const v=JSON.parse(localStorage.getItem(DONE_MISS_KEY)||'[]');return new Set(Array.isArray(v)?v.filter(x=>typeof x==='string'):[]);}catch{return new Set();}}
+function saveDoneMiss(set){try{localStorage.setItem(DONE_MISS_KEY,JSON.stringify([...set].slice(-5000)));}catch{}}
 async function fillTimesFromDone({onStage=()=>{},maxPages=10}={}){
  fillQueryTimes(records.query);
- const missing=()=>records.query.filter(o=>!o.timeSource&&/^\d{4}-\d{2}-\d{2}$/.test(String(o.time||'').trim()));
+ const miss=loadDoneMiss();
+ const missing=()=>records.query.filter(o=>!o.timeSource&&o.fromCampus===campus&&!miss.has(o.id)&&/^\d{4}-\d{2}-\d{2}$/.test(String(o.time||'').trim()));
  let need=missing();const before=need.length;
  if(!before)return {need:0,filled:0,pages:0};
  const oldest=need.map(o=>String(o.time).trim()).sort()[0];
@@ -716,6 +722,7 @@ async function fillTimesFromDone({onStage=()=>{},maxPages=10}={}){
    try{s=await request({type:'flowNextPage',flowTab:'已办'});}catch{break;}
    if(s.atEnd||s.stale)break;
   }
+  if(!bulkCancelled&&need.length){for(const o of need)miss.add(o.id);saveDoneMiss(miss);}
  }finally{try{await request({type:'flowFirst',flowTab:'待办'});}catch{}}
  return {need:before,filled:before-need.length,pages:page};
 }
@@ -725,7 +732,7 @@ async function afterQueryRead(){
  say('快件查询已读完，正在读取原站「待办」…');$('bulkBar').removeAttribute('value');
  const got=await readTodo({onStage:say});
  let note=got?'待办 '+todoRows().length+' 单':'待办读取失败（'+lastTodoError+'）';
- try{const t=await fillTimesFromDone({onStage:say});note+=t.need?'；下单时分从已办补上 '+t.filled+'/'+t.need+' 单（翻了 '+t.pages+' 页）':'；下单时分都已齐全';}
+ try{const t=await fillTimesFromDone({onStage:say});note+=t.need?'；下单时分从已办补上 '+t.filled+'/'+t.need+' 单（翻了 '+t.pages+' 页）':'；下单时分无需补（本校区的单都已齐全）';}
  catch(e){note+='；补下单时分未完成：'+e.message;}
  $('bulkBar').max=100;$('bulkBar').value=100;
  return note;

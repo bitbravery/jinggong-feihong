@@ -45,15 +45,15 @@ console.log('通过：待办行有「通过 / 退回 / 打印申请单」，单�
 
 // —— 4) 从已办补下单时分：已有时分跳过；找齐就停；最后把原站切回待办 ——
 (async()=>{
- const timesEnv=`let records={query:[],flow:[]},bulkCancelled=false,orderTimes=null;const ORDER_TIME_KEY='k';const store={};const localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v}};`;
- const T=new Function('SourceMapping','request',timesEnv+fn('function flowTimeText(')+fn('function loadOrderTimes(')+fn('function rememberOrderTimes(')+fn('function timeFromFlow(')+fn('function fillQueryTimes(')+fn('async function fillTimesFromDone(')+';return {records,fillTimesFromDone};');
+ const timesEnv=`let records={query:[],flow:[]},bulkCancelled=false,orderTimes=null,campus='良乡';const ORDER_TIME_KEY='k';store=store||{};const localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=v}};`;
+ const T=new Function('SourceMapping','request','store',timesEnv+fn('function flowTimeText(')+fn('function loadOrderTimes(')+fn('function rememberOrderTimes(')+fn('function timeFromFlow(')+fn('function fillQueryTimes(')+fn('function loadDoneMiss(')+fn('function saveDoneMiss(')+"const DONE_MISS_KEY='m';"+fn('async function fillTimesFromDone(')+';return {records,fillTimesFromDone};');
  const H=['流程事项名称','发起人','单号','寄件人工号','寄件人姓名','寄件人电话','下单时间','物流信息','寄件校区地址','收件人姓名','收件校区地址'];
  const row=(id,t)=>['寄件申请信息单','甲',id,'1','甲','138',t,'订单申请','良乡','乙','中关村'];
  const pages=[[row('JGKD700301','2026年11月20日 13时05分'),row('JGKD700309','2026年11月20日 12时00分')],[row('JGKD700302','2026年11月19日 08时07分')],[row('JGKD700303','2026年11月18日 09时00分')]];
  const calls=[];let p=0;
  const req=async m=>{calls.push(m.type+':'+(m.flowTab||''));if(m.type==='flowFirst'&&m.flowTab==='已办'){p=0;return {kind:'flow',flowTab:'已办',headers:H,rows:pages[0],next:true};}if(m.type==='flowNextPage'){p++;return {kind:'flow',flowTab:'已办',headers:H,rows:pages[p]||[],atEnd:p>=pages.length};}return {};};
  const A=T(SourceMapping,req);
- A.records.query.push({id:'JGKD700301',time:'2026-11-20'},{id:'JGKD700302',time:'2026-11-19'},{id:'Q0',time:'2026-11-20 10:00',timeSource:'grid'});
+ A.records.query.push({id:'JGKD700301',time:'2026-11-20',fromCampus:'良乡'},{id:'JGKD700302',time:'2026-11-19',fromCampus:'良乡'},{id:'Q0',time:'2026-11-20 10:00',timeSource:'grid',fromCampus:'良乡'},{id:'JGKD700380',time:'2026-11-01',fromCampus:'中关村'});
  const res=await A.fillTimesFromDone();
  assert.deepEqual({...res},{need:2,filled:2,pages:2},JSON.stringify(res));
  assert.equal(A.records.query[0].time,'2026-11-20 13:05');assert.equal(A.records.query[1].time,'2026-11-19 08:07');
@@ -62,9 +62,12 @@ console.log('通过：待办行有「通过 / 退回 / 打印申请单」，单�
  calls.length=0;const B=T(SourceMapping,req);B.records.query.push({id:'Q0',time:'2026-11-20 10:00',timeSource:'grid'});
  assert.deepEqual({...(await B.fillTimesFromDone())},{need:0,filled:0,pages:0});assert.deepEqual(calls,[],'都有时分时不应去已办');
  // 整页都早于缺时分的最早那天就停
- calls.length=0;const C=T(SourceMapping,req);C.records.query.push({id:'JGKD700399',time:'2026-11-21'});
+ calls.length=0;const shared={};const C=T(SourceMapping,req,shared);C.records.query.push({id:'JGKD700399',time:'2026-11-21',fromCampus:'良乡'});
  const rc=await C.fillTimesFromDone();assert.equal(rc.pages,1,'整页都比要找的日子早时不再往后翻');
- console.log('通过：从已办补下单时分——已有时分跳过、不碰原站；找齐或翻过最早那天就停；读完把原站切回待办。');
+ // 翻过一次仍找不到的单号记下来，下次不再为它翻已办
+ calls.length=0;const C2=T(SourceMapping,req,shared);C2.records.query.push({id:'JGKD700399',time:'2026-11-21',fromCampus:'良乡'});
+ assert.deepEqual({...(await C2.fillTimesFromDone())},{need:0,filled:0,pages:0});assert.deepEqual(calls,[],'找过没找到的单不该再翻已办');
+ console.log('通过：从已办补下单时分——只找本校区发出的单；已有时分或找过没找到的跳过、不碰原站；找齐或翻过最早那天就停；读完把原站切回待办。');
 
  // —— 5) 读取流程：近一个月 / 自定义时段读完快件查询后接着读待办、补时分；待办标签下“读取当前页”读全部待办 ——
  assert(/const extra=await afterQueryRead\(\)/.test(fn("$('readAll').onclick")),'近一个月 / 自定义时段读完后要读待办并补时分');
