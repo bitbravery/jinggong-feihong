@@ -50,6 +50,6 @@ assert(/type:'submissionComplete',order:\{id:msg\.id\},target:msg\.from,token:rt
 
 // ---------- ⑤ 结束后核对待办 ----------
 const live=fs.readFileSync(__dirname+'/../live.js','utf8');
-assert(/const left=ids\.filter\(id=>got\.ids\.has\(id\)\)/.test(live),'刷新后要核对所选单号是否仍在本次读回的待办里（v1.0.17：不看本地合并的旧行）');
+assert(/got=await readTodo\(\{front:true\}\)/.test(live)&&/const left=ids\.filter\(id=>got\.has\(id\)\)/.test(live),'刷新后要核对所选单号是否仍在本次读回的待办里（v1.0.17：不看本地合并的旧行；v1.0.33 起读全部待办页）');
 assert(/请到原站核对是否已'\+label/.test(live),'仍在待办的要提示到原站核对');
 console.log('通过：标签消失须本单点过确定才算成功；批量通过只点新弹窗的确定；结束后核对待办。');

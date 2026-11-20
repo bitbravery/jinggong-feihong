@@ -69,7 +69,7 @@ const lines=m=>m.rows.filter(r=>r.kind).map(r=>r.cells.map(c=>c.v));
  assert(/id="batchChange"[^>]*>批量改状态<\/button><button id="exportPickup"[^>]*>导出取送件<\/button>/.test(html),'“导出取送件”紧挨在“批量改状态”右边');
  assert(html.indexOf('pickup.js')>0&&html.indexOf('pickup.js')<html.indexOf('live.js'),'pickup.js 要在 live.js 之前加载');
  assert(/data-mode="type"[\s\S]*取送件优先[\s\S]*data-mode="building"[\s\S]*楼宇优先/.test(html),'导出时可选两种排法');
- assert(/\$\('exportPickup'\)\.hidden=isTodo/.test(live),'待办里（批量通过/退回）不显示');
+ assert(/\$\('batchChange'\)\.hidden=\$\('exportPickup'\)\.hidden=!!selKinds\.todo&&!m/.test(live),'只勾待办时（批量通过/退回）不显示');
  assert(/FeiHongPickup\.build\(list,\{campus,mode,mappings,api:FeiHong,now\}\)/.test(live));
  assert(/a\.download=nextExportName\('取送件清单'\)/.test(live),'文件名：取送件清单+日期');
  const nn=live.slice(live.indexOf('function nextExportName'));const N=new Function('localStorage',nn.slice(0,nn.indexOf('\n}')+2)+';return nextExportName;')({_:{},getItem(k){return this._[k]||null},setItem(k,v){this._[k]=v}});
