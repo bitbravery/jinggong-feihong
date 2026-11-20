@@ -46,7 +46,7 @@ function liveRun(result){
  // 页面里的入口：工作台（我的待办数字 / 业务管理中心按钮 / 我的服务卡片），业务管理中心（业务包卡片），业务包页（快件查询卡片）
  const OPENS={todoCount:'【流程】',centerButton:'业务管理中心',packageCard:'京工飞鸿两校快件',queryCard:'快件查询',serviceCard:'京工飞鸿两校快件系统'};
  const ON={todoCount:'工作台',centerButton:'工作台',serviceCard:'工作台',packageCard:'业务管理中心',queryCard:'京工飞鸿两校快件'};
- function portal(start,{broken={},noClose={},reloadOnClick=true,lazy=true}={}){
+ function portal(start,{broken={},noClose={},reloadOnClick=true,lazy=true,blankReads=2,closeAllSame=false}={}){
   const P={tabs:start.map((t,i)=>({text:t,active:i===0})),clicks:[],closes:[],tabClicks:[],blank:0,scrolled:0};
   P.active=()=>P.tabs.find(t=>t.active);
   P.exec=async({target,args:[c]})=>{
@@ -54,7 +54,7 @@ function liveRun(result){
    const top=r=>[{frameId:0,result:r}],frame=r=>[{frameId:7,result:r}];
    if(c.type==='stdTabs')return top({stdTabs:P.tabs.map(t=>({text:t.text,active:t.active,closable:t.text!=='工作台'&&noClose[t.text]!==true}))});
    if(c.type==='stdTabClick'){const t=P.tabs[c.index];if(!t||t.text!==c.text)return top({stdError:'变了'});P.tabClicks.push(t.text);P.tabs.forEach(x=>x.active=x===t);return top({stdDone:true});}
-   if(c.type==='stdTabClose'){const t=P.tabs[c.index];if(!t||t.text!==c.text)return top({stdError:'变了'});P.closes.push(t.text);if(noClose[t.text]==='stuck')return top({stdDone:true});const was=t.active;P.tabs.splice(c.index,1);if(was)P.tabs[0].active=true;return top({stdDone:true});}
+   if(c.type==='stdTabClose'){const t=P.tabs[c.index];if(!t||t.text!==c.text)return top({stdError:'变了'});P.closes.push(t.text);if(noClose[t.text]==='stuck')return top({stdDone:true});if(closeAllSame&&P.tabs.filter(x=>x.text===t.text).length>1){const was2=P.tabs.some(x=>x.text===t.text&&x.active);P.tabs=P.tabs.filter(x=>x.text!==t.text);if(was2)P.tabs[0].active=true;return top({stdDone:true});}const was=t.active;P.tabs.splice(c.index,1);if(was)P.tabs[0].active=true;return top({stdDone:true});}
    if(c.type==='stdScroll'){P.scrolled++;return frame({stdScrolled:true,atEnd:false});}
    if(c.type==='stdDiag')return frame({stdDiag:true,top:false,path:'workbench.htm',visible:true,ready:'complete',marks:['我的待办'],found:[]});
    if(c.type==='stdLocate'||c.type==='stdClick'){
@@ -65,7 +65,7 @@ function liveRun(result){
     if(c.type==='stdLocate')return frame({stdFound:true,sample:c.target});
     assert.equal(JSON.stringify(target.frameIds),'[7]','只能在找到目标的那个帧里点');
     P.clicks.push(c.target);
-    if(broken[c.target]!=='silent'){P.tabs.forEach(x=>x.active=false);P.tabs.push({text:OPENS[c.target],active:true});if(reloadOnClick)P.blank=2;}
+    if(broken[c.target]!=='silent'){P.tabs.forEach(x=>x.active=false);P.tabs.push({text:OPENS[c.target],active:true});if(reloadOnClick)P.blank=blankReads;}
     return frame({stdClicked:true,sample:c.target});
    }
    return [];
@@ -154,6 +154,33 @@ function liveRun(result){
   const r3=await boot(Z)({type:'openStandardPages'});
   assert(/“某个没有关闭按钮的页”标签没有关闭按钮/.test(r3.error),r3.error);
   console.log('通过：失败时说明卡在第几步、当前有哪些标签，并附页面诊断。');
+ }
+
+ // 3f 现场 2026-11-20：点“待办”数字后原站整页跳转很久（这里约 25 秒读不到标签栏）——只等，不重复点；
+ //    旧版 12 秒就再点一次，多开一个【流程】，再关重复的时候门户把两个都关了，最后缺【流程】
+ {
+  const P=portal(['工作台'],{blankReads:100});
+  const r=await boot(P)({type:'openStandardPages'});
+  assert(r.ok,JSON.stringify(r));
+  assert.deepEqual(P.clicks,['todoCount','centerButton','packageCard','queryCard','serviceCard'],'整页跳转期间不能重复点：'+P.clicks);
+  assert.deepEqual(names(P).sort(),[...STD].sort());
+  assert(Number.isFinite(r.data.seconds),'成功结果要带总用时');
+  assert(r.data.trail.some(s=>/整页跳转中/.test(s)),'过程记录要写出整页跳转');
+  console.log('通过：原站整页跳转很久时只等不重复点，不会多开重复标签；结果带用时和过程记录。');
+ }
+ // 3g 门户连带关闭：关掉重复的【流程】时两个都没了——要发现并补开，最后仍是四个
+ {
+  const P=portal(['工作台','【流程】','快件查询','【流程】','京工飞鸿两校快件系统'],{closeAllSame:true});
+  const r=await boot(P)({type:'openStandardPages'});
+  assert(r.ok,JSON.stringify(r));
+  assert.deepEqual(P.clicks,['todoCount'],'只该补开【流程】：'+P.clicks);
+  assert.deepEqual(names(P).sort(),[...STD].sort());assert.equal(P.active().text,'快件查询');
+  assert(r.data.trail.some(s=>/门户连带关掉了 【流程】/.test(s)),'要记下门户连带关掉了哪个');
+  // 补开也失败时，失败信息里要有过程记录
+  const Q=portal(['工作台','【流程】','快件查询','【流程】','京工飞鸿两校快件系统'],{closeAllSame:true,broken:{todoCount:true}});
+  const r2=await boot(Q)({type:'openStandardPages'});
+  assert.equal(r2.ok,false);assert(/过程：.*门户连带关掉了 【流程】/.test(r2.error),r2.error);
+  console.log('通过：关重复标签时门户把标准标签连带关掉，会发现并补开；补不开时失败信息带过程记录。');
  }
 
  // —— 4) 注入层：关键约束 ——

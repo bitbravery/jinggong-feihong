@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.29';
+const COMPONENT_VERSION = '1.0.30';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -156,17 +156,22 @@ function stdPlan(tabs){
  tabs.forEach((t,i)=>{const k=stdKey(t.text);if(k&&!seen.has(k)){seen.add(k);return;}close.push({index:i,text:t.text,closable:t.closable});});
  return {close,missing:STD_TABS.map(x=>x.name).filter(n=>!seen.has(n))};
 }
+// 过程记录：每个动作带秒数，成功/失败都附上，方便找出慢在哪、卡在哪
+let stdT0=0,stdTrail=[];
+const stdSec=ms=>(ms/1000).toFixed(1);
+function stdNote(s){stdTrail.push(stdSec(Date.now()-stdT0)+'s '+s);if(stdTrail.length>40)stdTrail.shift();}
 async function stdActivate(name){
  for(let i=0;i<4;i++){
   const tabs=await stdWaitTabs(ts=>ts.some(t=>stdIs(t,name)),'门户里没有“'+name+'”标签',10000);
   const idx=tabs.findIndex(t=>stdIs(t,name));
-  if(tabs[idx].active){await pause(300);return;}
+  if(tabs[idx].active)return;
   await stdExec({type:'stdTabClick',index:idx,text:tabs[idx].text});
-  try{await stdWaitTabs(ts=>ts.some(t=>stdIs(t,name)&&t.active),'',3000);await pause(600);return;}catch{}
+  try{await stdWaitTabs(ts=>ts.some(t=>stdIs(t,name)&&t.active),'',3000);await pause(300);return;}catch{}
  }
  throw Error('“'+name+'”标签切不到前台');
 }
-// 从右往左关多余/重复的标签，每关一个都确认它真的没了
+// 从右往左关多余/重复的标签，每关一个都确认少了它；若门户把标准标签也连带关掉，记下来，后面补开
+// （现场 2026-11-20：重复的两个【流程】在门户里可能是同一个标签，关掉后一个会把前一个也关掉）
 async function stdCloseExtras(){
  let closed=0;
  for(let k=0;k<15;k++){
@@ -178,8 +183,11 @@ async function stdCloseExtras(){
   standardStage('关闭多余标签“'+c.text+'”');
   const out=await stdExec({type:'stdTabClose',index:c.index,text:c.text});
   const bad=out.find(r=>r.stdError);if(bad)throw Error(bad.stdError);
-  await stdWaitTabs(t2=>t2.length<ts.length,'点了“'+c.text+'”的关闭按钮，但它没有消失',8000);
-  closed++;await pause(300);
+  const after=await stdWaitTabs(t2=>t2.length<ts.length,'点了“'+c.text+'”的关闭按钮，但它没有消失',8000);
+  closed++;
+  const lost=STD_TABS.map(x=>x.name).filter(n=>ts.some(t=>stdIs(t,n))&&!after.some(t=>stdIs(t,n)));
+  stdNote('关掉“'+c.text+'”'+(lost.length?'，门户连带关掉了 '+lost.join('、'):''));
+  await pause(150);
  }
  throw Error('多余标签关了 15 次还没关完');
 }
@@ -198,17 +206,26 @@ async function stdClickTarget(target,label,budget=25000){
   if(m&&m.needScroll&&!atEnd&&scrolls<20){
    const s=await stdExec({type:'stdScroll'});scrolls++;
    atEnd=s.length>0&&s.every(r=>r.atEnd);
-   await pause(600);continue;
+   await pause(400);continue;
   }
-  await pause(400);
+  await pause(300);
  }
  throw Error(label+'：'+(miss||'页面里找不到这个入口')+'（等了 '+Math.round(budget/1000)+' 秒）');
 }
-// 点入口 → 等新标签出现；第一次点了 12 秒没反应就再点一次（多开的重复标签最后会被关掉）
+// 点入口 → 等新标签出现。原站整页跳转（暂时读不到标签栏）时只等、不重复点，最多等 45 秒；
+// 只有页面完全没反应（没跳转、10 秒内也没出现新标签）才再点一次——避免多开一个重复标签。
 async function stdOpenVia(target,label,tabName){
  for(let i=0;i<2;i++){
-  await stdClickTarget(target,label);
-  try{await stdWaitTabs(ts=>ts.some(t=>stdIs(t,tabName)),'',i?30000:12000);await pause(500);return;}catch{}
+  const c=await stdClickTarget(target,label);
+  stdNote('点'+label+(c.sample?'（'+c.sample+'）':''));
+  const t0=Date.now();let reloading=false;
+  while(Date.now()-t0<(reloading?45000:10000)){
+   const ts=await stdTabs();
+   if(!ts){if(!reloading)stdNote('原站整页跳转中，等它加载');reloading=true;}
+   else if(ts.some(t=>stdIs(t,tabName))){stdNote('“'+tabName+'”已出现（'+stdSec(Date.now()-t0)+' 秒）');return;}
+   await pause(250);
+  }
+  stdNote('“'+tabName+'”'+stdSec(Date.now()-t0)+' 秒没出现'+(i?'':'，再点一次'));
  }
  throw Error('点了'+label+'，但“'+tabName+'”标签一直没有出现');
 }
@@ -219,36 +236,15 @@ async function stdDiagText(){
   return vis.map(f=>(f.top?'顶层':'')+(f.path||'/')+(f.ready!=='complete'?'('+f.ready+')':'')+'：'+(f.marks.join('/')||'无关键字')+(f.found.length?'；能找到 '+f.found.join(','):'')).join('｜').slice(0,700)||'没有看得见的页面';
  }catch(e){return '诊断失败：'+e.message;}
 }
-async function openStandardPages(){
- stdLastError='';
- await bringPortalFront();
- let no=0;
- const step=async(title,fn)=>{
-  no++;standardStage(title);
-  try{return await fn();}
-  catch(e){let ts=null;try{ts=await stdTabs();}catch{}throw Error('卡在第 '+no+' 步「'+title+'」：'+e.message+'。当前原站标签：'+stdList(ts)+'。页面诊断：'+await stdDiagText()+(stdLastError?'。最近一次注入出错：'+stdLastError:''));}
- };
- const tabs=await step('检查原站标签',async()=>{
-  const ts=await stdWaitTabs(()=>true,'没有读到门户标签栏，请回到学校门户首页，点一次红色飞鸿图标重新连接',10000);
-  if(!ts.some(t=>stdIs(t,'工作台')))throw Error('门户里没有“工作台”标签，请先回到门户首页');
-  return ts;
- });
- const first=stdPlan(tabs);
- if(!first.close.length&&!first.missing.length){
-  await step('切到“快件查询”',()=>stdActivate('快件查询'));
-  return {already:true,tabs:STD_TABS.map(x=>x.name),opened:[],closed:0};
- }
- let closed=0;
- if(tabs.some(t=>t.text==='物流状态调整单')&&await portalSaving())
-  await step('等原站“物流状态调整单”保存完',async()=>{try{await waitSaved(standardStage);}catch{throw Error('90 秒内没有保存完，为避免门户卡死已停止');}});
- closed+=await step('关闭多余和重复的标签',stdCloseExtras);
- const missing=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000)).missing;
- if(missing.includes('【流程】'))await step('从工作台“我的待办”点“待办”数字，打开【流程】',async()=>{
+// 三个标准页面各自的打开方法（与人工操作一致）
+const STD_OPEN={
+ '【流程】':{title:'从工作台“我的待办”点“待办”数字，打开【流程】',async run(){
   await stdActivate('工作台');
-  await stdExec({type:'stdScroll',to:'top'});await pause(300);
+  await stdExec({type:'stdScroll',to:'top'});
   await stdOpenVia('todoCount','“我的待办”里寄件申请信息单的“待办”数字','【流程】');
- });
- if(missing.includes('快件查询'))await step('打开快件查询（业务管理中心 → 京工飞鸿两校快件 → 快件查询）',async()=>{
+  return 0;
+ }},
+ '快件查询':{title:'打开快件查询（业务管理中心 → 京工飞鸿两校快件 → 快件查询），再关掉这两个临时标签',async run(){
   await stdActivate('工作台');
   standardStage('下滑工作台，点「业务管理中心 »」');
   await stdOpenVia('centerButton','工作台下方的「业务管理中心 »」','业务管理中心');
@@ -258,21 +254,58 @@ async function openStandardPages(){
   await stdActivate('京工飞鸿两校快件');
   standardStage('在“京工飞鸿两校快件”页面点“快件查询”');
   await stdOpenVia('queryCard','“京工飞鸿两校快件”页面里的“快件查询”','快件查询');
- });
- if(missing.includes('快件查询'))closed+=await step('关掉“业务管理中心”“京工飞鸿两校快件”两个临时标签',stdCloseExtras);
- if(missing.includes('京工飞鸿两校快件系统'))await step('从工作台“我的服务”打开京工飞鸿两校快件系统',async()=>{
+  standardStage('关掉“业务管理中心”“京工飞鸿两校快件”两个临时标签');
+  return stdCloseExtras();
+ }},
+ '京工飞鸿两校快件系统':{title:'从工作台“我的服务”打开京工飞鸿两校快件系统',async run(){
   await stdActivate('工作台');
   standardStage('在工作台找到“我的服务”，点「京工飞鸿两…」');
   await stdOpenVia('serviceCard','“我的服务”里的「京工飞鸿两…」卡片','京工飞鸿两校快件系统');
+  return 0;
+ }},
+};
+async function openStandardPages(){
+ stdLastError='';stdT0=Date.now();stdTrail=[];
+ await bringPortalFront();
+ let no=0;
+ const step=async(title,fn)=>{
+  no++;const t0=Date.now();standardStage(title);stdNote('第 '+no+' 步：'+title);
+  try{const r=await fn();stdNote('第 '+no+' 步完成（'+stdSec(Date.now()-t0)+' 秒）');return r;}
+  catch(e){let ts=null;try{ts=await stdTabs();}catch{}throw Error('卡在第 '+no+' 步「'+title+'」：'+e.message+'。当前原站标签：'+stdList(ts)+'。页面诊断：'+await stdDiagText()+(stdLastError?'。最近一次注入出错：'+stdLastError:'')+'。过程：'+stdTrail.slice(-14).join(' → '));}
+ };
+ const tabs=await step('检查原站标签',async()=>{
+  const ts=await stdWaitTabs(()=>true,'没有读到门户标签栏，请回到学校门户首页，点一次红色飞鸿图标重新连接',10000);
+  if(!ts.some(t=>stdIs(t,'工作台')))throw Error('门户里没有“工作台”标签，请先回到门户首页');
+  return ts;
  });
- closed+=await step('最后核对：只留四个标准标签',async()=>{
-  const n=await stdCloseExtras();
+ const first=stdPlan(tabs);
+ if(!first.close.length&&!first.missing.length){
+  await step('切到“快件查询”',()=>stdActivate('快件查询'));
+  return {already:true,tabs:STD_TABS.map(x=>x.name),opened:[],closed:0,seconds:Math.round((Date.now()-stdT0)/1000)};
+ }
+ let closed=0;const opened=[];
+ if(tabs.some(t=>t.text==='物流状态调整单')&&await portalSaving())
+  await step('等原站“物流状态调整单”保存完',async()=>{try{await waitSaved(standardStage);}catch{throw Error('90 秒内没有保存完，为避免门户卡死已停止');}});
+ closed+=await step('关闭多余和重复的标签',stdCloseExtras);
+ // 缺哪个开哪个；开完核对一遍，被门户连带关掉的再补开一次
+ for(let round=0;round<2;round++){
+  const missing=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000)).missing;
+  if(!missing.length)break;
+  if(round)stdNote('核对发现缺 '+missing.join('、')+'，补开');
+  for(const name of ['【流程】','快件查询','京工飞鸿两校快件系统']){
+   if(!missing.includes(name))continue;
+   closed+=(await step((round?'补开：':'')+STD_OPEN[name].title,()=>STD_OPEN[name].run()))||0;
+   opened.push(name);
+  }
+  closed+=await step('核对：多余和重复的标签都关掉',stdCloseExtras);
+ }
+ await step('最后核对：只留四个标准标签',async()=>{
   const pl=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000));
-  if(pl.missing.length)throw Error('还缺 '+pl.missing.join('、'));
-  return n;
+  if(pl.missing.length)throw Error('补开后还缺 '+pl.missing.join('、'));
+  if(pl.close.length)throw Error('还有多余标签 '+pl.close.map(c=>c.text).join('、'));
  });
  await step('切到“快件查询”',()=>stdActivate('快件查询'));
- return {already:false,tabs:STD_TABS.map(x=>x.name),opened:missing,closed};
+ return {already:false,tabs:STD_TABS.map(x=>x.name),opened:[...new Set(opened)],closed,seconds:Math.round((Date.now()-stdT0)/1000),trail:stdTrail.slice()};
 }
 
 async function framePaths(){try{const out=await run({type:'frameReport'});return out.filter(r=>r&&r.path).map(r=>r.path);}catch{return [];}}
