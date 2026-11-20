@@ -15,6 +15,9 @@
      o.receiverId='';o.flow=snapshot.kind==='query'?'未读取流程':snapshot.flowTab;o.history=[];o.sourceKind=snapshot.kind;o.readAt=snapshot.readAt;
      o.sourceSequence=headers.includes('序号')?String(cells[headers.indexOf('序号')]??''):String(rowIndex+1);
      o.recordKey=[snapshot.kind,snapshot.page||1,snapshot.rowIds?.[rowIndex]||rowIndex].join(':');
+     // v1.0.27：快件查询的下单时间只到日，注入层从原站表格数据里按单号取到了时分时补上（日期必须一致）
+     const full=snapshot.rowTimes?.[rowIndex];
+     if(full&&String(o.time).slice(0,10)===String(full).slice(0,10)){o.time=String(full);o.timeSource='grid';}
      return o;
    });
    const groups=new Map();for(const o of result){if(!groups.has(o.id))groups.set(o.id,[]);groups.get(o.id).push(o);}

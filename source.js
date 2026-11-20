@@ -1142,7 +1142,38 @@ function sourceAction(command){
    const probeSettled=probe&&(probe.loaded||(!probe.strictLoad&&(probe.nodes.some(n=>!n.isConnected)||probe.signature!==bodyRows.map(text).join('\n'))));
    const nextBtn=document.querySelector('.mini-pager a[title="下一页"]');
    const hasNext=!!nextBtn&&!nextBtn.classList.contains('mini-disabled');
-   return {path,active:kind==='flow'?flowActiveTab():'',next:hasNext,kind,headers,rows,rowIds:bodyRows.map(r=>r.id),pager,page,pageSize,total:summary?Number(summary[1]):null,scope:activeTags||'沿用原站当前查询条件；当前页',flowTab,pathTab,probeToken:probe?.token,probeSettled:!!probeSettled,readAt:new Date().toISOString(),sourcePath:path};
+   // v1.0.27：快件查询的下单时间列只显示年月日，但 MiniUI 表格背后的原始行数据常常带时分。
+   // 只读：从表格数据里按完整单号找“日期时间”值，日期和本行显示的下单时间一致才用；找不到就不填（列表照旧只显示日期）。
+   // 不猜字段名，按值匹配；timeField 只用于诊断显示是哪个字段。
+   let rowTimes=null,timeHits=0,timeField='';
+   if(kind==='query'){
+    try{
+     const pad=n=>String(n).padStart(2,'0');
+     const asTime=v=>{
+      if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate())+' '+pad(v.getHours())+':'+pad(v.getMinutes());
+      const m=String(v??'').match(/^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})日?[ T]+(\d{1,2})[:时](\d{1,2})/);
+      return m?m[1]+'-'+pad(m[2])+'-'+pad(m[3])+' '+pad(m[4])+':'+pad(m[5]):'';
+     };
+     const grids=Array.from(document.querySelectorAll('.mini-grid')).map(el=>window.mini?.get?.(el.id)).filter(g=>g&&typeof g.getData==='function');
+     const data=grids.length===1?(grids[0].getData()||[]):[];
+     const byId=new Map();
+     for(const item of data){
+      if(!item||typeof item!=='object')continue;
+      // 一行里可能有好几个日期时间（下单时间、处理时间……）：全收下，按行匹配时取日期一致里最早的那个（下单一定不晚于处理）
+      let id='';const times=[];
+      for(const [k,v] of Object.entries(item)){
+       if(!id&&typeof v==='string'&&/^JGKD\d+$/.test(v.trim()))id=v.trim();
+       const x=asTime(v);if(x&&!/ 00:00$/.test(x))times.push({t:x,f:k});
+      }
+      if(id&&times.length&&!byId.has(id))byId.set(id,times);
+     }
+     const idCol=headers.findIndex(h=>h.replace(/\s/g,'')==='单号'),dateCol=headers.findIndex(h=>h.replace(/\s/g,'')==='下单时间');
+     if(byId.size&&idCol>=0&&dateCol>=0){
+      rowTimes=rows.map(r=>{const list=byId.get(String(r[idCol]||'').trim());if(!list)return '';const day=String(r[dateCol]||'').trim().slice(0,10);const same=list.filter(x=>x.t.slice(0,10)===day).sort((a,b)=>a.t.localeCompare(b.t));if(!same.length)return '';timeHits++;timeField=same[0].f;return same[0].t;});
+     }
+    }catch{rowTimes=null;}
+   }
+   return {path,active:kind==='flow'?flowActiveTab():'',next:hasNext,kind,headers,rows,rowIds:bodyRows.map(r=>r.id),rowTimes,timeHits,timeField,pager,page,pageSize,total:summary?Number(summary[1]):null,scope:activeTags||'沿用原站当前查询条件；当前页',flowTab,pathTab,probeToken:probe?.token,probeSettled:!!probeSettled,readAt:new Date().toISOString(),sourcePath:path};
  }
  if(command.type==='page'){
    if(Array.from(document.querySelectorAll('.mini-mask-loading,.mini-grid-loading')).some(e=>e.getBoundingClientRect().height>0&&getComputedStyle(e).visibility!=='hidden'))return {waiting:true};

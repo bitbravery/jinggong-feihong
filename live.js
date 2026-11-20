@@ -117,9 +117,19 @@ function wholeTodo(s){return !!s&&s.kind==='flow'&&s.flowTab==='待办'&&(s.page
 // 流程列表读到 0 行、又没等过加载确认时，这次结果不可信，不拿它刷新
 const untrustedEmpty=s=>!!s&&s.kind==='flow'&&Array.isArray(s.rows)&&!s.rows.length&&!s.emptyConfirmed;
 let lastReadIds=null;
+// v1.0.27：快件查询的下单时间只到日。原站表格数据里没取到时分的单，若在待办/已办里读到过（那边是“2026年11月18日 10时59分”），用那边的时分补上
+function timeFromFlow(id,day){
+ const hit=records.flow.find(o=>o.id===id&&/时/.test(String(o.time||'')));if(!hit)return '';
+ const m=String(hit.time).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})\D+(\d{1,2})\D+(\d{1,2})/);if(!m)return '';
+ const p=n=>String(n).padStart(2,'0'),t=m[1]+'-'+p(m[2])+'-'+p(m[3])+' '+p(m[4])+':'+p(m[5]);
+ return t.slice(0,10)===day?t:'';
+}
 function setSnapshotExtra(s,{singlePage=false}={}){
  lastReadError='';
  const parsed=SourceMapping.normalize(s);
+ let timeFromFlowHits=0;
+ if(s.kind==='query')for(const o of parsed){if(o.timeSource)continue;const day=String(o.time||'').slice(0,10);const t=/^\d{4}-\d{2}-\d{2}$/.test(String(o.time||'').trim())?timeFromFlow(o.id,day):'';if(t){o.time=t;o.timeSource='flow';timeFromFlowHits++;}}
+ s={...s,timeFlowHits:timeFromFlowHits};
  lastReadIds={kind:s.kind,flowTab:s.flowTab||'',ids:new Set(parsed.map(o=>o.id)),whole:wholeTodo(s)};
  const m=mergeParsed(parsed,s.kind,s.flowTab,{keepOld:untrustedEmpty(s)});
  // v1.0.17：total/pageSize 保持原站的值（翻页、“原站共 N 条”要用）；本次读回的行数记 fetched
@@ -131,7 +141,7 @@ function refreshNote(m){if(m.kept)return '这次读到的列表是空的，可�
 // v1.0.22：所有读取都用本次结果刷新（见 mergeParsed）
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.26')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.27')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  // v1.0.26：读取当前页（快件查询、待办、已办）也让原站在前台：切分类、等列表加载都靠原站页面自己跑
@@ -172,7 +182,7 @@ function render(listOnly=false){
  $('prevPage').disabled=busy||!s?.page||s.page<=1;
  $('nextPage').disabled=busy||!s||!s.pageSize||!s.total||s.page>=Math.ceil(s.total/s.pageSize);
  $('sourcePage').textContent=s?.page?'原站第 '+s.page+' 页':'';
- const connectionDetail=s?`${s.bulk?(s.complete?'近一个月全部页面读取完成':'读取未完成，以下仅为已读部分'):'原站当前页'}：本次读到 ${s.fetched??s.rows.length} 行 / 原站范围 ${s.total??'未识别'} 行。${s.bulk?'已读 '+s.pagesRead+' / '+s.pageCount+' 页。':''}${duplicateIds?'有 '+duplicateIds+' 个重复单号，涉及 '+duplicateRows+' 行，全部保留并禁止修改。':''}读取时间 ${formatTime(new Date(s.readAt))}（北京时间）。${s.bulk?(s.dateRange?'下单时间 '+s.dateRange.from+' 至 '+s.dateRange.to+'。分批读取期间数据可能更新。':'分批读取期间数据可能更新；可重新读取刷新。'):'当前仅本页；一键读取近一个月可自动读取该时段所有状态、所有页面。'}`:'尚未读取。可读取当前页，或一键读取近一个月所有状态与页面。';
+ const connectionDetail=s?`${s.bulk?(s.complete?'近一个月全部页面读取完成':'读取未完成，以下仅为已读部分'):'原站当前页'}：本次读到 ${s.fetched??s.rows.length} 行 / 原站范围 ${s.total??'未识别'} 行。${s.bulk?'已读 '+s.pagesRead+' / '+s.pageCount+' 页。':''}${duplicateIds?'有 '+duplicateIds+' 个重复单号，涉及 '+duplicateRows+' 行，全部保留并禁止修改。':''}读取时间 ${formatTime(new Date(s.readAt))}（北京时间）。${s.kind==='query'&&Array.isArray(s.rows)?'下单时分：原站表格取到 '+(Number(s.timeHits)||0)+' 行'+(s.timeField?'（字段 '+s.timeField+'）':'')+(s.timeFlowHits?'，从待办/已办补上 '+s.timeFlowHits+' 行':'')+'，共 '+s.rows.length+' 行。':''}${s.bulk?(s.dateRange?'下单时间 '+s.dateRange.from+' 至 '+s.dateRange.to+'。分批读取期间数据可能更新。':'分批读取期间数据可能更新；可重新读取刷新。'):'当前仅本页；一键读取近一个月可自动读取该时段所有状态、所有页面。'}`:'尚未读取。可读取当前页，或一键读取近一个月所有状态与页面。';
  $('connection').title=lastReadError||connectionDetail;
  $('connection').textContent=lastReadError?('读取未完成：'+(s?.bulk&&!s.complete?'仅已读 '+(s.fetched??s.rows.length)+'/'+(s.total??'—')+' 行 · ':'')+lastReadError):s?`${s.bulk?(s.complete?'近一个月读取完成':'未读完，仅显示已读部分'):'当前页读取完成'} · ${s.bulk?(s.fetched??s.rows.length)+'/'+(s.total??'—')+' 行 · '+s.pagesRead+'/'+s.pageCount+' 页':'本页 '+(s.fetched??s.rows.length)+' 行（原站共 '+(s.total??'—')+'）'}${(s.localCount??s.rows.length)!==(s.fetched??s.rows.length)?' · 本地共 '+s.localCount+' 条':''} · ${formatTime(new Date(s.readAt))}${s.dateRange?' · '+s.dateRange.from+' 至 '+s.dateRange.to:''}${duplicateIds?' · '+duplicateIds+' 个重复单号（禁改）':''}`:'尚未读取';
  if(currentView==='flow'&&!lastReadError&&s)$('connection').textContent='流程已读取 '+s.rows.length+' 条'+(s.limited?'（前 '+s.pagesRead+' 页，可继续读取）':'');

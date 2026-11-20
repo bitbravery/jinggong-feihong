@@ -7,7 +7,7 @@
    checkCancel();const first=await request({type:'beginAll',range});
    if(!Number.isInteger(first.total)||first.total<0||!first.pageSize||first.page!==1)fail('无法确认全部查询的总数、每页条数或首页，停止读取。');
    const pages=Math.max(1,Math.ceil(first.total/first.pageSize)),headers=JSON.stringify(first.headers),firstSignature=JSON.stringify(first.rows);
-   combined={...first,rows:[],rowIds:[],bulk:true,complete:false,pagesRead:0,pageCount:pages,startedAt:new Date().toISOString(),scope:'全部物流状态，正在逐页读取'};
+   combined={...first,rows:[],rowIds:[],rowTimes:[],timeHits:0,bulk:true,complete:false,pagesRead:0,pageCount:pages,startedAt:new Date().toISOString(),scope:'全部物流状态，正在逐页读取'};
    const add=(s,page)=>{
     if(s.page!==page||s.total!==first.total||s.pageSize!==first.pageSize||JSON.stringify(s.headers)!==headers)fail('原站页码、总数或表头在读取期间发生变化；本批次不完整，请重新读取。');
     const expected=Math.max(0,Math.min(first.pageSize,first.total-(page-1)*first.pageSize));
@@ -24,7 +24,7 @@
     }
     const sequence=s.headers.findIndex(h=>h.replace(/\s/g,'')==='序号');
     if(sequence>=0&&s.rows.some((r,i)=>Number(r[sequence])!==(page-1)*first.pageSize+i+1))fail('原站行序号与当前页不一致，停止读取以免漏页或重复计数。');
-    combined.rows.push(...s.rows);combined.rowIds.push(...s.rows.map((_,i)=>page+':'+(s.rowIds?.[i]||i)));combined.pagesRead=page;combined.readAt=s.readAt;
+    combined.rows.push(...s.rows);combined.rowTimes.push(...(Array.isArray(s.rowTimes)?s.rowTimes:s.rows.map(()=>'')));combined.timeHits+=Number(s.timeHits)||0;combined.rowIds.push(...s.rows.map((_,i)=>page+':'+(s.rowIds?.[i]||i)));combined.pagesRead=page;combined.readAt=s.readAt;
     onProgress({rowsRead:combined.rows.length,total:first.total,page,pages,partial:combined});
    };
    add(first,1);
