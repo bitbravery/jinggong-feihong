@@ -401,11 +401,11 @@ dialog{max-width:calc(94vw / var(--z,1));max-height:calc(100vh / var(--z,1) - 24
 .selection-bar .selected-hidden{margin-left:4px;color:#b85d0c;font-size:12px}
 
 /* v1.0.33：待办合并进快件查询 */
-.status-tab.todo-tab.has-todo{border-color:#d93025;color:#b3261e;background:#fdecea}
-.status-tab.todo-tab.has-todo b{background:#d93025;color:#fff}
-.status-tab.todo-tab.has-todo.active{background:#d93025;border-color:#d93025;color:#fff}
-.status-tab.todo-tab.has-todo.active b{background:#fff;color:#d93025}
-.status.todo-status{background:#fdecea;color:#b3261e;font-weight:700}
+.status-tab.todo-tab.has-todo{border-color:#1a73e8;color:#1558b0;background:#e8f0fe}
+.status-tab.todo-tab.has-todo b{background:#1a73e8;color:#fff}
+.status-tab.todo-tab.has-todo.active{background:#1a73e8;border-color:#1a73e8;color:#fff}
+.status-tab.todo-tab.has-todo.active b{background:#fff;color:#1a73e8}
+.status.todo-status{background:#e8f0fe;color:#1558b0;font-weight:700}
 .row-actions .todo-approve{color:#146b59;font-weight:700}
 .row-actions .todo-reject{color:#b3261e}
 .selection-bar .selection-mixed{color:#b3261e;font-size:12px;white-space:nowrap}
