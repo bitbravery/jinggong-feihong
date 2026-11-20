@@ -42,8 +42,11 @@ assert.equal(orders[1].time,'2026-11-19');assert.equal(orders[2].time,'2026-11-1
  // —— 工作台：原站表格没取到的，用待办/已办里的时分补 ——
  const live=fs.readFileSync(D+'live.js','utf8');
  const a=live.indexOf('// v1.0.22：每次读取都用本次结果刷新'),b=live.indexOf('// v1.0.22：所有读取都用本次结果刷新');
- const L=new Function('SourceMapping',`let records={query:[],flow:[]},snapshots={query:null,flow:null},lastReadError='';
+ // 假的本机存储：多个“工作台”共用，模拟关掉重开
+ const store={};globalThis.localStorage={getItem:k=>k in store?store[k]:null,setItem:(k,v)=>{store[k]=String(v);}};
+ const boot=()=>new Function('SourceMapping',`let records={query:[],flow:[]},snapshots={query:null,flow:null},lastReadError='';
 ${live.slice(a,b)};return {get records(){return records},set records(v){records=v},get snapshots(){return snapshots},setSnapshotExtra};`)(SourceMapping);
+ const L=boot();
  L.records={query:[],flow:[{id:'JGKD700202',flow:'已办',time:'2026年11月19日 08时07分'},{id:'JGKD700203',flow:'待办',time:'2026年11月17日 10时00分'}]};
  L.setSnapshotExtra(snap);
  const q=L.records.query;
@@ -51,6 +54,21 @@ ${live.slice(a,b)};return {get records(){return records},set records(v){records=
  assert.equal(q.find(o=>o.id==='JGKD700202').time,'2026-11-19 08:07','没用待办/已办的时分补上');
  assert.equal(q.find(o=>o.id==='JGKD700203').time,'2026-11-18','日期不一致的待办时分也被拿来用了');
  assert.equal(L.snapshots.query.timeFlowHits,1);
- assert(/下单时分：原站表格取到/.test(live),'读取状态里要写明取到时分的行数');
- console.log('通过：原站表格没取到的单，用待办/已办里同一天的时分补上；读取状态写明取到几行。');
+ assert(/下单时分：'\+got\+'\/'\+all\+' 行已有时分/.test(live),'读取状态里要写明多少行有时分');
+ console.log('通过：原站表格没取到的单，用待办/已办里同一天的时分补上；读取状态写明多少行有时分。');
+
+ // v1.0.28：读到待办/已办就把时分记在本机；工作台关掉重开、内存里没有流程数据，快件查询也能补上
+ const flowHeaders=['流程事项名称','发起人','单号','寄件人工号','寄件人姓名','寄件人电话','下单时间','物流信息','寄件校区地址','收件人姓名','收件校区地址'];
+ const frow=(id,t)=>['寄件申请信息单','甲',id,'1','甲','138','x','订单申请','良乡','乙','中关村'].map((v,i)=>i===6?t:v);
+ const L2=boot();
+ L2.setSnapshotExtra({kind:'flow',flowTab:'已办',headers:flowHeaders,rows:[frow('JGKD700203','2026年11月18日 09时30分'),frow('JGKD700204','2026年11月19日 20时46分')],page:1,pageSize:20,total:2,readAt:'t'});
+ assert(store['feihong-order-times-v1'],'读已办后没有记下时分');
+ const L3=boot();// 关掉重开：内存里什么都没有
+ L3.setSnapshotExtra(snap);
+ assert.equal(L3.records.query.find(o=>o.id==='JGKD700203').time,'2026-11-18 09:30','重开后没用本机记下的时分补上');
+ assert.equal(L3.records.query.find(o=>o.id==='JGKD700202').time,'2026-11-19','没有记录的单不该凭空有时分');
+ // 先读快件查询、后读已办：已经显示的快件查询记录也要补上
+ L3.setSnapshotExtra({kind:'flow',flowTab:'已办',headers:flowHeaders,rows:[frow('JGKD700202','2026年11月19日 08时07分')],page:1,pageSize:20,total:1,readAt:'t'});
+ assert.equal(L3.records.query.find(o=>o.id==='JGKD700202').time,'2026-11-19 08:07','后读已办没有给已读的快件查询补上时分');
+ console.log('通过：读待办/已办会把时分记在本机，重开工作台后快件查询照样能补上；后读已办也会补到已显示的记录上。');
 })().catch(e=>{console.error(e);process.exitCode=1;});
