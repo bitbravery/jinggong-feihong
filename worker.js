@@ -192,15 +192,20 @@ async function stdCloseExtras(){
  throw Error('多余标签关了 15 次还没关完');
 }
 // 在看得见的页面里找到目标、点一下；找不到就往下滚（工作台下方区块是滚动懒加载）再等
-async function stdClickTarget(target,label,budget=25000){
+// done(标签栏)：目标标签已经出现就算成功——现场 2026-11-21：点“快件查询”卡片后该帧立刻跳走，
+// 注入报 “Frame with ID … was removed”，其实已经点上了；旧版当成没点，又找了 25 秒才报错。
+async function stdClickTarget(target,label,budget=25000,done){
  const end=Date.now()+budget;let miss='',scrolls=0,atEnd=false;
  while(Date.now()<end){
+  if(done){const ts=await stdTabs();if(ts&&done(ts))return {already:true};}
   const out=await stdExec({type:'stdLocate',target});
   const found=out.find(r=>r.stdFound);
   if(found){
+   stdLastError='';
    const res=await stdExec({type:'stdClick',target},[found.frameId]);
    const c=res.find(r=>r.stdClicked);
    if(c)return c;
+   if(/was removed|frame.*(removed|detached)/i.test(stdLastError))return {sample:'点后该页面立刻跳转'};
   }
   const m=out.find(r=>r.stdMissing);if(m)miss=m.stdMissing;
   if(m&&m.needScroll&&!atEnd&&scrolls<20){
@@ -216,7 +221,9 @@ async function stdClickTarget(target,label,budget=25000){
 // 只有页面完全没反应（没跳转、10 秒内也没出现新标签）才再点一次——避免多开一个重复标签。
 async function stdOpenVia(target,label,tabName){
  for(let i=0;i<2;i++){
-  const c=await stdClickTarget(target,label);
+  const has=ts=>ts.some(t=>stdIs(t,tabName));
+  const c=await stdClickTarget(target,label,25000,has);
+  if(c.already){stdNote('“'+tabName+'”已出现');return;}
   stdNote('点'+label+(c.sample?'（'+c.sample+'）':''));
   const t0=Date.now();let reloading=false;
   while(Date.now()-t0<(reloading?45000:10000)){
@@ -292,7 +299,8 @@ async function openStandardPages(){
   const missing=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000)).missing;
   if(!missing.length)break;
   if(round)stdNote('核对发现缺 '+missing.join('、')+'，补开');
-  for(const name of ['【流程】','快件查询','京工飞鸿两校快件系统']){
+  // 【流程】最后开：走业务管理中心那条路时原站可能整页重载，重载后【流程】会丢（现场 2026-11-21）
+  for(const name of ['快件查询','京工飞鸿两校快件系统','【流程】']){
    if(!missing.includes(name))continue;
    closed+=(await step((round?'补开：':'')+STD_OPEN[name].title,()=>STD_OPEN[name].run()))||0;
    opened.push(name);

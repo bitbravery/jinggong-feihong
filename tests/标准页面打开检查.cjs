@@ -107,13 +107,13 @@ function liveRun(result){
   const P=portal(['工作台']);
   const r=await boot(P)({type:'openStandardPages'});
   assert(r.ok,JSON.stringify(r)+' clicks='+P.clicks+' closes='+P.closes+' tabClicks='+P.tabClicks);
-  assert.deepEqual(P.clicks,['todoCount','centerButton','packageCard','queryCard','serviceCard'],'打开顺序/路径应与录屏一致');
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'打开顺序/路径应与录屏一致');
   sameSet(P.closes,['业务管理中心','京工飞鸿两校快件']);
   sameSet(names(P),STD);assert.equal(P.tabs.length,4);assert.equal(P.active().text,'快件查询');
   assert(P.scrolled>=2,'工作台下方区块要先往下滚才会加载');
   assert(P.stages.some(s=>/业务管理中心/.test(s))&&P.stages.some(s=>/我的服务/.test(s)),'进度要显示当前步骤');
   sameSet(JSON.parse(JSON.stringify(r.data.opened)),['【流程】','快件查询','京工飞鸿两校快件系统']);
-  console.log('通过：只有工作台时按录屏路径打开【流程】→ 快件查询（经业务管理中心、业务包页）→ 京工飞鸿两校快件系统，临时标签已关，最后切到快件查询。');
+  console.log('通过：只有工作台时按录屏路径打开快件查询（经业务管理中心、业务包页）→ 京工飞鸿两校快件系统 →【流程】，临时标签已关，最后切到快件查询。');
  }
 
  // 3c 多余 + 重复：只关多余/重复，只开缺的
@@ -162,7 +162,7 @@ function liveRun(result){
   const P=portal(['工作台'],{blankReads:100});
   const r=await boot(P)({type:'openStandardPages'});
   assert(r.ok,JSON.stringify(r));
-  assert.deepEqual(P.clicks,['todoCount','centerButton','packageCard','queryCard','serviceCard'],'整页跳转期间不能重复点：'+P.clicks);
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'整页跳转期间不能重复点：'+P.clicks);
   assert.deepEqual(names(P).sort(),[...STD].sort());
   assert(Number.isFinite(r.data.seconds),'成功结果要带总用时');
   assert(r.data.trail.some(s=>/整页跳转中/.test(s)),'过程记录要写出整页跳转');
@@ -181,6 +181,21 @@ function liveRun(result){
   const r2=await boot(Q)({type:'openStandardPages'});
   assert.equal(r2.ok,false);assert(/过程：.*门户连带关掉了 【流程】/.test(r2.error),r2.error);
   console.log('通过：关重复标签时门户把标准标签连带关掉，会发现并补开；补不开时失败信息带过程记录。');
+ }
+
+ // 3h 现场 2026-11-21：点“快件查询”卡片后该帧立刻跳走，注入报 Frame removed（其实点上了）；
+ //    随后原站整页重载：前台回到工作台、【流程】丢了。要认出已点上、不再找 25 秒，并把【流程】补回来
+ {
+  const P=portal(['工作台','【流程】']);const exec=P.exec;
+  P.exec=async o=>{const c=o.args[0];
+   if(c.type==='stdClick'&&c.target==='queryCard'){await exec(o);P.tabs=P.tabs.filter(t=>t.text!=='【流程】');P.tabs.forEach((t,i)=>t.active=i===0);throw Error('Frame with ID 124 was removed.');}
+   return exec(o);};
+  const r=await boot(P)({type:'openStandardPages'});
+  assert(r.ok,JSON.stringify(r));
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'快件查询卡片只点一次，【流程】补开：'+P.clicks);
+  assert.deepEqual(names(P).sort(),[...STD].sort());assert.equal(P.active().text,'快件查询');
+  assert(r.data.seconds<30,'不能再白等 25 秒：'+r.data.seconds);
+  console.log('通过：点卡片后页面立刻跳走（注入报帧已移除）也认作已点上；整页重载丢掉的【流程】会补开。');
  }
 
  // —— 4) 注入层：关键约束 ——
