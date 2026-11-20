@@ -387,3 +387,14 @@ dialog{max-width:calc(94vw / var(--z,1));max-height:calc(100vh / var(--z,1) - 24
 #changeDialog{max-height:calc(100vh / var(--z,1) - 28px)}
 #toast{max-width:calc(90vw / var(--z,1))}
 .diagnose-text{max-height:calc(44vh / var(--z,1))}
+
+/* v1.0.31：导出取送件 */
+.selection-bar .pickup-export{border-color:#dd7414;color:#b85d0c;font-weight:600}
+.selection-bar .pickup-export:hover:not(:disabled){background:#fdecdb}
+#pickupDialog{max-width:calc(560px / var(--z,1))}
+.pickup-modes{display:grid;gap:10px;margin:12px 0}
+.pickup-mode{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:12px 14px;white-space:normal;height:auto}
+.pickup-mode b{font-size:15px}.pickup-mode span{color:var(--muted,#667);font-size:13px;line-height:1.45}
+.pickup-mode.last-used{border-color:var(--green,#146b59);box-shadow:0 0 0 2px rgba(20,107,89,.15)}
+.pickup-chip{display:inline-block;padding:1px 8px;border-radius:4px;color:#fff;font-weight:700;font-size:12px}
+.pickup-chip.send{background:#2f6fb5}.pickup-chip.take{background:#dd7414}

@@ -156,7 +156,7 @@ function refreshNote(m){if(m.kept)return '这次读到的列表是空的，可�
 // v1.0.22：所有读取都用本次结果刷新（见 mergeParsed）
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.30')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.31')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  // v1.0.26：读取当前页（快件查询、待办、已办）也让原站在前台：切分类、等列表加载都靠原站页面自己跑
@@ -210,7 +210,7 @@ function render(listOnly=false){
  }
  const rowMarkup=visible.map((o,idx)=>`<tr class="${selected.has(o.id)?'row-selected':''}"><td class="select-cell"><input type="checkbox" data-select="${E(o.id)}" ${o.duplicateOrder?'disabled':''} ${selected.has(o.id)?'checked':''} aria-label="选择 ${E(o.id)}"></td><td class="sequence-cell">${E(seqMode==='local'?(idx+1):(o.sourceSequence??o.seq??''))}</td><td><b>${E(o.id)}</b>${o.duplicateOrder?`<small class="duplicate-warning">原站重复单号 ×${o.duplicateCount}${o.duplicateConflict?' · 信息有冲突':''}（禁改）</small>`:''}<small>${E(FeiHong.orderTime(o.time))}<br>${E(o.item)}</small></td><td>${E(o.sender)} ${personBadge(o)}<small>${E(o.personId)}<br>${E(o.phone)}</small></td><td>${E(o.fromCampus)} · ${E(o.building)} ${E(o.room)}${(()=>{const r=region(o,mappings);if(!r||r==='—')return '';return '<span class="person-tag region-tag '+({'北校区':'north','东校区':'east','南校区':'south','东南校区':'southeast','区域待分配':'pending'}[r]||'other')+'">'+E(r)+'</span>';})()}<small>↓ ${E(o.toCampus)} · ${E(o.destination)}</small></td><td>${E(o.receiver)}<small>${E(o.receiverPhone)}</small></td><td><span class="status s${statuses.indexOf(o.status)}">${E(o.status)}</span><small>${flow?'流程：'+E(o.workflowState||o.flow):''}${o.statusSource==='write'?(flow?'<br>':'')+'工作台已改，待重新读取确认':''}</small></td><td><div class="row-actions"><button data-print="${E(o.id)}" data-flow="${E(o.flow||'')}">打印申请单</button><button data-change="${E(o.id)}" ${(o.duplicateOrder||o.flow==='待办')?'disabled title="待办单需先在原站“批量处理→通过”，变成已办后才能改物流状态"':''}>改物流状态</button><button data-detail="${E(o.recordKey)}">详情</button></div></td></tr>`).join('')||emptyRow();
  $('rows').innerHTML=rowMarkup.replace(/<td([^>]*)>/g,'<td$1><div class="cell-content">').replace(/<\/td>/g,'</div></td>');
- $('resultCount').textContent=`${snapshots[kind()]?.bulk&&!snapshots[kind()].complete?'未读完 · 仅已读取部分；':''}本页 ${visible.length} 行 · 匹配 ${matching.length} / 已读取 ${orders().length} 行`;$('selectedCount').textContent=selected.size;{const isTodo=currentView==='flow'&&flowTab==='待办';$('batchApprove').hidden=!isTodo;$('batchReject').hidden=!isTodo;$('batchChange').hidden=isTodo;}const showBar=['orders','flow'].includes(currentView)&&selected.size>0;const sb=$('selectionBar');if(sb)sb.hidden=!showBar;if(document.body&&document.body.classList)document.body.classList.toggle('has-selection-bar',showBar);$('batchChange').disabled=!selected.size||busy;$('batchChange').textContent='批量改状态';$('selectAll').disabled=eligible.length===0;$('selectAll').checked=eligible.length>0&&eligible.every(o=>selected.has(o.id));$('selectAll').indeterminate=eligible.some(o=>selected.has(o.id))&&!eligible.every(o=>selected.has(o.id));
+ $('resultCount').textContent=`${snapshots[kind()]?.bulk&&!snapshots[kind()].complete?'未读完 · 仅已读取部分；':''}本页 ${visible.length} 行 · 匹配 ${matching.length} / 已读取 ${orders().length} 行`;$('selectedCount').textContent=selected.size;{const isTodo=currentView==='flow'&&flowTab==='待办';$('batchApprove').hidden=!isTodo;$('batchReject').hidden=!isTodo;$('batchChange').hidden=isTodo;$('exportPickup').hidden=isTodo;}const showBar=['orders','flow'].includes(currentView)&&selected.size>0;const sb=$('selectionBar');if(sb)sb.hidden=!showBar;if(document.body&&document.body.classList)document.body.classList.toggle('has-selection-bar',showBar);$('batchChange').disabled=!selected.size||busy;$('batchChange').textContent='批量改状态';$('selectAll').disabled=eligible.length===0;$('selectAll').checked=eligible.length>0&&eligible.every(o=>selected.has(o.id));$('selectAll').indeterminate=eligible.some(o=>selected.has(o.id))&&!eligible.every(o=>selected.has(o.id));
  if(!listOnly)document.dispatchEvent(new Event('feihong-layout')); 
 }
 function emptyRow(){
@@ -668,6 +668,31 @@ $('selectAll').onchange=e=>{for(const o of filtered().slice((localPage-1)*LOCAL_
 $('batchApprove').onclick=()=>bulkApprove('approve');
 $('batchReject').onclick=()=>bulkApprove('reject');
 $('cancelSelection').onclick=()=>{selected.clear();render();};$('batchChange').onclick=()=>openChange([...selected]);
+// v1.0.31：导出取送件清单（只用已读取的数据，不碰原站）。上次选的排法记在本机。
+const PICKUP_MODE_KEY='feihong-pickup-mode';
+function pickupOrders(){const ids=new Set(selected);return orders().filter(o=>ids.has(o.id));}
+function openPickup(){
+ const list=pickupOrders();if(!list.length){toast('请先勾选要导出的单子。');return;}
+ const m=FeiHongPickup.build(list,{campus,mappings,api:FeiHong});
+ $('pickupSummary').textContent='已选 '+list.length+' 件（以'+campus+'窗口为准）：送件 '+m.counts.send+' 件，取件 '+m.counts.take+' 件'+(m.skipped.length?'；另有 '+m.skipped.length+' 件既不从'+campus+'寄出、也不寄到'+campus+'，不导出':'')+'。选一种排法：';
+ let last='type';try{last=localStorage.getItem(PICKUP_MODE_KEY)||'type';}catch{}
+ for(const b of document.querySelectorAll('#pickupDialog .pickup-mode'))b.classList.toggle('last-used',b.dataset.mode===last);
+ $('pickupDialog').showModal();
+}
+function exportPickup(mode){
+ const list=pickupOrders();
+ const now=formatTime(new Date()).slice(0,16);
+ const m=FeiHongPickup.build(list,{campus,mode,mappings,api:FeiHong,now});
+ if(!m.items){toast('勾选的单子里没有从'+campus+'寄出或寄到'+campus+'的件，没有可导出的。');return;}
+ try{localStorage.setItem(PICKUP_MODE_KEY,mode);}catch{}
+ const url=URL.createObjectURL(new Blob([createStyledWorkbook(m)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})),a=document.createElement('a');
+ a.href=url;a.download='取送件清单-'+campus+'-'+now.replace(/[-: ]/g,'').slice(0,8)+'-'+now.slice(11,16).replace(':','')+(mode==='building'?'-楼宇优先':'-取送件优先')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ $('pickupDialog').close();
+ toast('已导出取送件清单：送件 '+m.counts.send+' 件、取件 '+m.counts.take+' 件'+(m.skipped.length?'（'+m.skipped.length+' 件不属于'+campus+'，未导出）':'')+'。',7000);
+}
+$('exportPickup').onclick=openPickup;
+for(const id of ['closePickup','cancelPickup'])$(id).onclick=()=>$('pickupDialog').close();
+$('pickupDialog').addEventListener('click',e=>{const b=e.target.closest('.pickup-mode');if(b)exportPickup(b.dataset.mode);});
 function printFormHtml(o){
  const v=x=>E(x==null||x===''?'—':String(x));
  const cols='<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"></colgroup>';
