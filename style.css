@@ -398,3 +398,4 @@ dialog{max-width:calc(94vw / var(--z,1));max-height:calc(100vh / var(--z,1) - 24
 .pickup-mode.last-used{border-color:var(--green,#146b59);box-shadow:0 0 0 2px rgba(20,107,89,.15)}
 .pickup-chip{display:inline-block;padding:1px 8px;border-radius:4px;color:#fff;font-weight:700;font-size:12px}
 .pickup-chip.send{background:#2f6fb5}.pickup-chip.take{background:#dd7414}
+.selection-bar .selected-hidden{margin-left:4px;color:#b85d0c;font-size:12px}
