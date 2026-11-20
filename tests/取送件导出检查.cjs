@@ -34,6 +34,7 @@ const lines=m=>m.rows.filter(r=>r.kind).map(r=>r.cells.map(c=>c.v));
  assert.equal(stu.cells[6].v,'学生');assert.equal(stu.cells[6].s,'takeStudent');
  assert.equal(stu.cells[1].s,'takeBadge');assert.equal(m.rows.find(r=>r.cells[11]&&r.cells[11].v==='A3').cells[1].s,'sendBadge');
  assert(m.rows.some(r=>r.merge&&/北校区 · 文萃楼A　　取 2/.test(r.cells[0].v)),'每栋楼前要有小标题');
+ assert(!m.rows.some(r=>/送到收件人|到寄件人/.test(r.cells[0].v)),'标题和分段行不要再写“送到收件人/到寄件人处取”的解释');
  console.log('通过：取送件优先——送件在上、取件在下、中间隔开；按区域/楼宇/房间排；取件看寄件人、送件看收件人；学生照样导出并醒目标注。');
 }
 // 楼宇优先：混排，同一栋楼的取送放在一起

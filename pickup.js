@@ -48,7 +48,7 @@
   const full=(text,style,ht)=>rows.push({merge:true,ht,cells:[{v:text,s:style},...Array(n-1).fill({v:'',s:style})]});
   const modeName=mode==='building'?'楼宇优先（一人既取又送）':'取送件优先（送件在上、取件在下）';
   full('京工飞鸿 · 取送件清单（'+campus+'窗口）','title',26);
-  full('导出 '+now+'　｜　送件 '+send.length+' 件　·　取件 '+take.length+' 件　｜　排法：'+modeName+'　｜　送件＝送到收件人，取件＝到寄件人处取','subtitle',20);
+  full('导出 '+now+'　｜　送件 '+send.length+' 件　·　取件 '+take.length+' 件　｜　排法：'+modeName,'subtitle',20);
   rows.push({header:true,ht:24,cells:COLS.map(c=>({v:c[0],s:'header'}))});
   let seq=0;
   const line=x=>{
@@ -74,9 +74,9 @@
    // 同一地点先送后取：手里的件先放下，再取新的
    groups([...send,...take].sort((a,b)=>byPlace(a,b)||(a.kind===b.kind?0:a.kind==='送件'?-1:1)));
   }else{
-   if(send.length){full('▼ 送件 · '+send.length+' 件 —— 送到收件人手里','sendSection',26);groups(send);}
+   if(send.length){full('▼ 送件 · '+send.length+' 件','sendSection',26);groups(send);}
    if(send.length&&take.length)rows.push({ht:14,cells:Array(n).fill({v:'',s:'gap'})});
-   if(take.length){full('▲ 取件 · '+take.length+' 件 —— 到寄件人那里取','takeSection',26);groups(take);}
+   if(take.length){full('▲ 取件 · '+take.length+' 件','takeSection',26);groups(take);}
   }
   return {rows,widths:COLS.map(c=>c[1]),headerRow:3,counts:{send:send.length,take:take.length},skipped,items:items.length};
  }
