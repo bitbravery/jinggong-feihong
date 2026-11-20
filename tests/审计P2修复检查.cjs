@@ -55,7 +55,7 @@ console.log('通过：多个工作台交替保存历史不再互相覆盖。');
 function boot(fakeRun,{store={}}={}){
  let T=1e6,listener;
  const ctx={importScripts(){},FeiHongWritePolicy:policy,SourceMapping,FeiHongDates:{recentMonth:()=>({})},
-  Date:{now:()=>T},setTimeout:(fn,ms)=>{T+=ms||0;setImmediate(fn);},
+  Date:{now:()=>T},setTimeout:(fn,ms)=>{T+=ms||0;setImmediate(fn);},clearTimeout(){},
   chrome:{action:{onClicked:{addListener(){}}},runtime:{getURL:p=>'extension://'+p,onMessage:{addListener:fn=>listener=fn},sendMessage:async()=>{}},
    storage:{session:{get:async()=>({sourceTabId:1})},local:{get:async k=>({[k]:store[k]}),set:async o=>Object.assign(store,o)}},
    tabs:{update:async()=>{},get:async()=>({}),query:async()=>[]},scripting:{executeScript:async()=>[]}}};
@@ -144,18 +144,20 @@ function boot(fakeRun,{store={}}={}){
   console.log('通过：实际状态回查可中途停止，未查的单号进失败清单。');
  }
 
- // #17：残留调整单没在保存时，打开标准页面不再白等 90 秒
+ // #17：残留调整单没在保存时，打开标准页面不再白等 90 秒（v1.0.29 起标准页面直接注入，见 标准页面打开检查.cjs）
  {
-  let reachedAt=0,w;
-  w=boot(async c=>{
-   if(c.type==='portalState')return [{tabs:['工作台','物流状态调整单'],forms:1}];
-   if(c.type==='portalBusy')return [{busy:false}];
-   if(c.type==='tabCloseAll'){if(!reachedAt)reachedAt=w.now();return [{closed:0}];}
-   return [];});
-  const t0=w.now();await w.call({type:'openStandardPages'});
-  assert(reachedAt,'没走到“关闭其他标签”这一步');
-  assert(reachedAt-t0<10000,'没在保存的残留调整单仍等了 '+Math.round((reachedAt-t0)/1000)+' 秒');
-  console.log('通过：没在保存的残留调整单不再等 90 秒，直接进入关闭标签。');
+  let reachedAt=0,w,tabs=['工作台','物流状态调整单'];
+  w=boot(async c=>{if(c.type==='portalBusy')return [{busy:false}];return [];});
+  w.ctx.sourceAction=()=>null;
+  w.ctx.chrome.scripting.executeScript=async({args:[c]})=>{
+   if(c.type==='stdTabs')return [{frameId:0,result:{stdTabs:tabs.map((t,i)=>({text:t,active:i===0,closable:t!=='工作台'}))}}];
+   if(c.type==='stdTabClose'){if(!reachedAt)reachedAt=w.now();tabs=tabs.filter((t,i)=>i!==c.index);return [{frameId:0,result:{stdDone:true}}];}
+   return [];};
+  const t0=w.now();const r17=await w.call({type:'openStandardPages'});
+  assert(reachedAt,'没走到“关闭多余标签”这一步：'+JSON.stringify(r17));
+  // 假时钟把每次注入的 6 秒超时上限也计入，所以阈值放到 60 秒：仍远小于“等保存”的 90 秒
+  assert(reachedAt-t0<60000,'没在保存的残留调整单仍等了 '+Math.round((reachedAt-t0)/1000)+' 秒');
+  console.log('通过：没在保存的残留调整单不再等 90 秒，直接关掉。');
  }
 
  // ============ source.js：假 DOM ============

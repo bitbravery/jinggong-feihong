@@ -156,7 +156,7 @@ function refreshNote(m){if(m.kept)return '这次读到的列表是空的，可�
 // v1.0.22：所有读取都用本次结果刷新（见 mergeParsed）
 function setSnapshot(s){return setSnapshotExtra(s);}
 function mergeSnapshot(s){return setSnapshotExtra(s,{singlePage:true});}
-async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.28')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
+async function requireComponent(){const c=await request({type:'hello'});if(!c||!c.recentRead||c.version!=='1.0.29')throw Error('后台版本不匹配（'+((c&&c.version)||'未知')+'）：请在 Edge 扩展管理页重新加载扩展，再从原站点击红色飞鸿图标重新连接。');}
 async function read(){
  if(busy)return;try{await requireComponent();}catch(err){toast(err.message,8000);return;}lastReadError='';lastReadIds=null;readProgress={rows:0,total:null,page:0,pages:1,percent:null,started:performance.now(),note:'读取当前页'};busy=true;render();$('readSource').textContent='正在读取…';$('bulkProgress').hidden=false;$('cancelBulk').disabled=true;$('bulkText').textContent='正在读取原站当前页…';$('bulkCount').textContent='已查询 0 条 · 等待当前页返回';$('bulkElapsed').textContent='';$('bulkBar').removeAttribute('value');drawReadProgress();
  try{  // v1.0.26：读取当前页（快件查询、待办、已办）也让原站在前台：切分类、等列表加载都靠原站页面自己跑
@@ -596,24 +596,30 @@ $('overview').onclick=e=>{const b=e.target.closest('[data-column]');if(b){active
 $('campusSwitch').onclick=e=>{const b=e.target.closest('[data-campus]');if(!b||busy||b.dataset.campus===campus)return;pendingCampus=b.dataset.campus;$('campusConfirmText').textContent='从'+campus+'窗口切换至'+pendingCampus+'窗口？';$('campusDialog').showModal();};
 $('confirmCampus').onclick=()=>{if(!pendingCampus||busy)return;campus=pendingCampus;pendingCampus=null;localPage=1;activeColumn='all';activeColumns=new Set(['all']);selected.clear();$('direction').value='all';$('region').value='all';save();$('campusDialog').close();render();};
 for(const id of ['cancelCampus','closeCampus'])$(id).onclick=()=>{pendingCampus=null;$('campusDialog').close();};
-// v0.9.215：一键把原站收拾成标准页面（关掉其他标签 → 只打开【流程】/快件查询/京工飞鸿两校快件系统）
+// v1.0.29：一键把原站收拾成标准四标签（工作台、【流程】、快件查询、京工飞鸿两校快件系统）。
+// 过程中原站切到前台（工作台下方区块要滚动才加载，后台标签页可能不渲染）；结束后切回扩展。
+const STANDARD_DONE='原站标准页面已打开：工作台、【流程】、快件查询、京工飞鸿两校快件系统';
 async function openStandardPages(){
  if(busy||standardBusy)return;
- standardBusy=true;const btn=$('openStandard'),label=btn?btn.textContent:'打开原站标准页面';if(btn){btn.disabled=true;btn.textContent='正在打开…';}
- $('bulkProgress').hidden=false;$('bulkBar').removeAttribute('value');$('bulkText').textContent='正在打开原站标准页面…';$('bulkCount').textContent='正在检查原站标签';lastReadError='';
+ standardBusy=true;const btn=$('openStandard'),label='打开原站标准页面';if(btn){btn.disabled=true;btn.textContent='正在打开…';}
+ $('bulkProgress').hidden=false;$('bulkBar').removeAttribute('value');$('bulkText').textContent='打开原站标准页面：检查原站标签';$('bulkCount').textContent='正在打开原站标准页面';lastReadError='';
+ let ok=false;
  try{
   await requireComponent();
-  const r=await request({type:'openStandardPages'});
-  $('bulkText').textContent=r.note||('原站标准页面已就绪：'+((r.tabs||[]).join('、')));
-  $('bulkCount').textContent='原站标准页面已就绪';
-  toast('原站标准页面已打开：'+((r.tabs||[]).join('、')),8000);
+  const r=await withPortalFront(()=>request({type:'openStandardPages'}));
+  ok=true;
+  const extra=r.already?'（原来就是这四个，没有开关任何标签）':('（'+(r.opened&&r.opened.length?'新打开 '+r.opened.join('、'):'没有新开')+(r.closed?'，关掉 '+r.closed+' 个多余标签':'')+'）');
+  $('bulkText').textContent=STANDARD_DONE+extra;$('bulkCount').textContent='原站标准页面已就绪';
+  const c=$('connection');if(c)c.textContent='原站标准页面已就绪';
+  toast(STANDARD_DONE+extra,8000);
  }catch(e){
-  $('bulkText').textContent='打开原站标准页面失败：'+e.message;$('bulkCount').textContent='打开原站标准页面失败';
-  toast('打开原站标准页面失败：'+e.message,12000);
+  $('bulkText').textContent='打开原站标准页面失败——'+e.message;$('bulkCount').textContent='打开原站标准页面失败';
+  const c=$('connection');if(c)c.textContent='打开原站标准页面失败';
+  toast('打开原站标准页面失败——'+e.message,20000);
  }finally{
   standardBusy=false;if(btn){btn.disabled=false;btn.textContent=label;}
   $('bulkBar').max=100;$('bulkBar').value=100;
-  setTimeout(()=>{if(!busy)$('bulkProgress').hidden=true;},6000);
+  if(ok)setTimeout(()=>{if(!busy&&!standardBusy)$('bulkProgress').hidden=true;},6000); // 失败信息留着，方便截图反馈
  }
 }
 $('openStandard').onclick=()=>{openStandardPages();};
