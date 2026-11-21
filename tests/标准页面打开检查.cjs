@@ -204,18 +204,38 @@ function liveRun(result){
   const P=portal(['工作台','快件查询']);const exec=P.exec;
   P.exec=async o=>{const c=o.args[0];const r=await exec(o);
    if(c.type==='stdClick'&&c.target==='serviceCard')P.tabs=P.tabs.filter(t=>t.text!=='【流程】');
+   if(c.type==='stdClick'&&c.target==='todoCount')P.tabs=P.tabs.filter(t=>t.text!=='京工飞鸿两校快件系统');
    return r;};
   const r=await boot(P)({type:'openStandardPages'});
   assert.equal(r.ok,false);
-  assert.deepEqual(P.clicks,['todoCount','serviceCard'],'每个只开一次，不来回补开：'+P.clicks);
+  assert.deepEqual(P.clicks,['todoCount','serviceCard','todoCount','serviceCard'],'只补开一轮，不来回打转：'+P.clicks);
   assert(/还缺 【流程】（打开“京工飞鸿两校快件系统”时，原站把 【流程】 关掉或替换了）/.test(r.error),r.error);
-  console.log('通过：打开一个页面把另一个标准页面弄没时，不来回补开，失败信息写清是打开谁时弄没了谁。');
+  console.log('通过：打开一个页面把另一个标准页面弄没时，只补开一轮、不来回打转；还不行就写清是打开谁时弄没了谁。');
  }
  // 3j 快件查询开完只关两个临时标签；打开顺序固定
  {
   assert(/return stdCloseTemp\(\);/.test(worker)&&/const STD_TEMP=\['业务管理中心','京工飞鸿两校快件'\]/.test(worker),'快件查询开完只关这两个临时标签');
-  assert(/for\(const name of \['快件查询','【流程】','京工飞鸿两校快件系统'\]\)/.test(worker),'打开顺序：快件查询 →【流程】→ 系统页');
+  assert(/const ORDER=\['快件查询','【流程】','京工飞鸿两校快件系统'\]/.test(worker),'打开顺序：快件查询 →【流程】→ 系统页');
   console.log('通过：快件查询开完只关“业务管理中心”“京工飞鸿两校快件”两个临时标签；打开顺序固定。');
+ }
+
+ // 3k 现场 2026-11-21 的根因：上一个标签还在加载（interactive）时就去工作台点下一个入口，门户会把那个还在加载的标签换掉。
+ //    每开一个都要等页面加载完、稳住再开下一个——这样四个都留得住
+ {
+  const P=portal(['工作台']);const exec=P.exec;P.loading=0;P.last=null;
+  P.exec=async o=>{const c=o.args[0];
+   if(c.type==='stdDiag'&&P.loading>0){P.loading--;return [{frameId:7,result:{stdDiag:true,top:false,path:'x.htm',visible:true,ready:'interactive',marks:[],found:[]}}];}
+   const home=c.type==='stdClick'&&['todoCount','serviceCard','centerButton'].includes(c.target)&&P.active().text==='工作台';
+   if(home&&P.loading>0&&P.last)P.tabs=P.tabs.filter(t=>t.text!==P.last);
+   const r=await exec(o);
+   if(c.type==='stdClick'&&r.length){P.loading=4;P.last=OPENS[c.target];}
+   return r;};
+  const r=await boot(P)({type:'openStandardPages'});
+  assert(r.ok,JSON.stringify(r)+' clicks='+P.clicks);
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','todoCount','serviceCard'],'每个只点一次：'+P.clicks);
+  assert.deepEqual(names(P).sort(),[...STD].sort());
+  assert(r.data.trail.some(x=>/页面已加载完，稳 1\.5 秒/.test(x)),'过程记录要写出等加载');
+  console.log('通过：每开一个页面都等它加载完、稳住再开下一个，门户不会把还在加载的标签换掉，四个都留得住。');
  }
 
  // —— 4) 注入层：关键约束 ——

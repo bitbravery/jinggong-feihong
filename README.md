@@ -4,7 +4,7 @@
 
 ## 下载
 
-最新版本：[v1.0.34](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.34)，安装包 [`jinggong-feihong-v1.0.34.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.34/jinggong-feihong-v1.0.34.zip)。SHA256 写在发布页的说明里，下载后可以用 `certutil -hashfile 文件名 SHA256` 对一下。
+最新版本：[v1.0.35](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.35)，安装包 [`jinggong-feihong-v1.0.35.zip`](https://github.com/bitbravery/jinggong-feihong/releases/download/v1.0.35/jinggong-feihong-v1.0.35.zip)。SHA256 写在发布页的说明里，下载后可以用 `certutil -hashfile 文件名 SHA256` 对一下。
 
 > **版本提醒：从 v1.0.33 起，「流程办理」合并进「快件查询及状态调整」**：待办在分类最前面的「待办」标签里审批，不再显示「已办」「抄送给我」和「实际状态回查」。如果你还要用旧的流程界面，请到发布页下载 [v1.0.32](https://github.com/bitbravery/jinggong-feihong/releases/tag/v1.0.32)，它是最后一个保留这套界面的版本。
 
@@ -18,7 +18,7 @@ Edge、360 浏览器、Chrome 这类能装扩展的 Chromium 内核浏览器都�
    - 解压后这个目录里应该直接能看到 `manifest.json`。如果多套了一层文件夹，加载时选里面那层。
 2. 地址栏输入 `edge://extensions`（Chrome 是 `chrome://extensions`），打开「开发人员模式」，点「加载解压缩的扩展」，选这个目录。
 3. 打开门户 `https://ehall.bit.edu.cn`，进入「京工飞鸿两校快件系统」，点工具栏上的红色飞鸿图标，会打开工作台。
-4. 工作台左下角显示 `接入版 v1.0.34 · 提交核验版` 就装好了。
+4. 工作台左下角显示 `接入版 v1.0.35 · 提交核验版` 就装好了。
 
 升级：解压覆盖原目录，在扩展管理页点这个扩展卡片上的刷新按钮，再回门户点一次飞鸿图标。只刷新工作台页面不会加载新的后台代码。
 

@@ -2,7 +2,7 @@ importScripts('source.js');
 importScripts('write-policy.js');
 importScripts('mapping.js');
 importScripts('date-range.js');
-const COMPONENT_VERSION = '1.0.34';
+const COMPONENT_VERSION = '1.0.35';
 // Every write requires a unique source record and matching form fields.
 const WRITES_ENABLED = true;
 chrome.action.onClicked.addListener(async tab=>{
@@ -191,6 +191,20 @@ async function stdCloseExtras(){
  }
  throw Error('多余标签关了 15 次还没关完');
 }
+// v1.0.35：新标签出现后，等它的页面加载完、再稳一会儿，才去开下一个。
+// 现场 2026-11-21：开完一个页面 1～2 秒内就去工作台点下一个入口，门户会把“还在加载的上一个标签”换成新页面
+// （诊断里页面都还是 interactive）；用户手动慢慢开，四个都能留住。
+async function stdSettle(name,budget=12000){
+ const t0=Date.now();let ok=false;
+ while(Date.now()-t0<budget){
+  const out=await stdExec({type:'stdDiag'});
+  const vis=out.filter(r=>r.stdDiag&&r.visible&&!r.top);
+  if(vis.length&&vis.every(r=>r.ready==='complete')){ok=true;break;}
+  await pause(300);
+ }
+ await pause(1500);
+ stdNote('“'+name+'”'+(ok?'页面已加载完':'页面 '+stdSec(budget)+' 秒还没加载完')+'，稳 1.5 秒（共 '+stdSec(Date.now()-t0)+' 秒）');
+}
 // 打开快件查询途中的两个临时标签：只认这两个名字（精确匹配），别的一概不碰，避免误关
 const STD_TEMP=['业务管理中心','京工飞鸿两校快件'];
 async function stdCloseTemp(){
@@ -317,21 +331,25 @@ async function openStandardPages(){
  closed+=await step('关闭多余和重复的标签',stdCloseExtras);
  // v1.0.34（按用户 2026-11-21 的要求）：三个页面各开各的，顺序固定 快件查询 →【流程】→ 京工飞鸿两校快件系统；
  // 每次开之前重新看标签栏，只开这时还缺的；不再来回补开（现场：开【流程】和开系统页会互相把对方弄没，来回补只会打转）。
- for(const name of ['快件查询','【流程】','京工飞鸿两校快件系统']){
+ // 每开一个都等它加载完、稳住再开下一个；开的时候把别的标准页面弄没了就记下，最后统一再补开一轮（同样等加载完）
+ const openOne=async(name,again)=>{
   const before=await stdWaitTabs(()=>true,'读不到门户标签栏',10000);
-  if(before.some(t=>stdIs(t,name)))continue;
-  closed+=(await step(STD_OPEN[name].title,()=>STD_OPEN[name].run()))||0;
+  if(before.some(t=>stdIs(t,name)))return;
+  closed+=(await step((again?'补开：':'')+STD_OPEN[name].title,async()=>{const r=await STD_OPEN[name].run();await stdSettle(name);return r;}))||0;
   opened.push(name);
   const after=await stdWaitTabs(()=>true,'读不到门户标签栏',10000);
   const gone=STD_TABS.map(x=>x.name).filter(n=>n!==name&&before.some(t=>stdIs(t,n))&&!after.some(t=>stdIs(t,n)));
   if(gone.length){lost.push({by:name,gone});stdNote('打开“'+name+'”后，原站的 '+gone.join('、')+' 不见了');}
- }
+ };
+ const ORDER=['快件查询','【流程】','京工飞鸿两校快件系统'];
+ for(const name of ORDER)await openOne(name,false);
+ if(lost.length)for(const name of ORDER)await openOne(name,true); // 只补一轮，不来回打转
  await step('最后核对：只留四个标准标签',async()=>{
   let pl=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000));
   if(pl.close.length){closed+=await stdCloseExtras();pl=stdPlan(await stdWaitTabs(()=>true,'读不到门户标签栏',10000));}
   if(pl.missing.length){
    const why=lost.filter(l=>l.gone.some(g=>pl.missing.includes(g))).map(l=>'打开“'+l.by+'”时，原站把 '+l.gone.filter(g=>pl.missing.includes(g)).join('、')+' 关掉或替换了');
-   throw Error('还缺 '+pl.missing.join('、')+(why.length?'（'+why.join('；')+'）':'')+'。请在原站手动打开缺的页面');
+   throw Error('还缺 '+pl.missing.join('、')+(why.length?'（'+[...new Set(why)].join('；')+'）':'')+'。请在原站手动打开缺的页面');
   }
   if(pl.close.length)throw Error('还有多余标签 '+pl.close.map(c=>c.text).join('、'));
  });
