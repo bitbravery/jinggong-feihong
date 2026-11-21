@@ -39,6 +39,7 @@ function liveRun(result){
   await F.open();
   assert(/打开原站标准页面失败——卡在第 3 步/.test(F.$('bulkText').textContent),'失败要把卡在哪一步写到进度条上');
   assert.equal(F.$('bulkProgress').hidden,false,'失败信息要留在页面上');
+  assert.equal(F.$('bulkBar').hidden,true,'失败后不再挂着进度条');assert.equal(F.$('cancelBulk').textContent,'关闭','失败后按钮变「关闭」，点了收起');
   console.log('通过：点击后禁用并显示“正在打开…”、进度条不确定、原站切前台执行、结束切回扩展；成功/失败提示完整。');
  }
 
@@ -107,13 +108,13 @@ function liveRun(result){
   const P=portal(['工作台']);
   const r=await boot(P)({type:'openStandardPages'});
   assert(r.ok,JSON.stringify(r)+' clicks='+P.clicks+' closes='+P.closes+' tabClicks='+P.tabClicks);
-  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'打开顺序/路径应与录屏一致');
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','todoCount','serviceCard'],'打开顺序/路径应与录屏一致');
   sameSet(P.closes,['业务管理中心','京工飞鸿两校快件']);
   sameSet(names(P),STD);assert.equal(P.tabs.length,4);assert.equal(P.active().text,'快件查询');
   assert(P.scrolled>=2,'工作台下方区块要先往下滚才会加载');
   assert(P.stages.some(s=>/业务管理中心/.test(s))&&P.stages.some(s=>/我的服务/.test(s)),'进度要显示当前步骤');
   sameSet(JSON.parse(JSON.stringify(r.data.opened)),['【流程】','快件查询','京工飞鸿两校快件系统']);
-  console.log('通过：只有工作台时按录屏路径打开快件查询（经业务管理中心、业务包页）→ 京工飞鸿两校快件系统 →【流程】，临时标签已关，最后切到快件查询。');
+  console.log('通过：只有工作台时按固定顺序打开快件查询（经业务管理中心、业务包页）→【流程】→ 京工飞鸿两校快件系统，临时标签已关，最后切到快件查询。');
  }
 
  // 3c 多余 + 重复：只关多余/重复，只开缺的
@@ -162,7 +163,7 @@ function liveRun(result){
   const P=portal(['工作台'],{blankReads:100});
   const r=await boot(P)({type:'openStandardPages'});
   assert(r.ok,JSON.stringify(r));
-  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'整页跳转期间不能重复点：'+P.clicks);
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','todoCount','serviceCard'],'整页跳转期间不能重复点：'+P.clicks);
   assert.deepEqual(names(P).sort(),[...STD].sort());
   assert(Number.isFinite(r.data.seconds),'成功结果要带总用时');
   assert(r.data.trail.some(s=>/整页跳转中/.test(s)),'过程记录要写出整页跳转');
@@ -192,10 +193,29 @@ function liveRun(result){
    return exec(o);};
   const r=await boot(P)({type:'openStandardPages'});
   assert(r.ok,JSON.stringify(r));
-  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','serviceCard','todoCount'],'快件查询卡片只点一次，【流程】补开：'+P.clicks);
+  assert.deepEqual(P.clicks,['centerButton','packageCard','queryCard','todoCount','serviceCard'],'快件查询卡片只点一次，【流程】补开：'+P.clicks);
   assert.deepEqual(names(P).sort(),[...STD].sort());assert.equal(P.active().text,'快件查询');
   assert(r.data.seconds<30,'不能再白等 25 秒：'+r.data.seconds);
   console.log('通过：点卡片后页面立刻跳走（注入报帧已移除）也认作已点上；整页重载丢掉的【流程】会补开。');
+ }
+
+ // 3i 现场 2026-11-21：开【流程】会把系统页弄没、开系统页又会把【流程】弄没——不来回补开打转，失败信息直接说清是谁把谁弄没的
+ {
+  const P=portal(['工作台','快件查询']);const exec=P.exec;
+  P.exec=async o=>{const c=o.args[0];const r=await exec(o);
+   if(c.type==='stdClick'&&c.target==='serviceCard')P.tabs=P.tabs.filter(t=>t.text!=='【流程】');
+   return r;};
+  const r=await boot(P)({type:'openStandardPages'});
+  assert.equal(r.ok,false);
+  assert.deepEqual(P.clicks,['todoCount','serviceCard'],'每个只开一次，不来回补开：'+P.clicks);
+  assert(/还缺 【流程】（打开“京工飞鸿两校快件系统”时，原站把 【流程】 关掉或替换了）/.test(r.error),r.error);
+  console.log('通过：打开一个页面把另一个标准页面弄没时，不来回补开，失败信息写清是打开谁时弄没了谁。');
+ }
+ // 3j 快件查询开完只关两个临时标签；打开顺序固定
+ {
+  assert(/return stdCloseTemp\(\);/.test(worker)&&/const STD_TEMP=\['业务管理中心','京工飞鸿两校快件'\]/.test(worker),'快件查询开完只关这两个临时标签');
+  assert(/for\(const name of \['快件查询','【流程】','京工飞鸿两校快件系统'\]\)/.test(worker),'打开顺序：快件查询 →【流程】→ 系统页');
+  console.log('通过：快件查询开完只关“业务管理中心”“京工飞鸿两校快件”两个临时标签；打开顺序固定。');
  }
 
  // —— 4) 注入层：关键约束 ——
